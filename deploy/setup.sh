@@ -11,7 +11,10 @@
 # the 5-minute healthcheck. Idempotent: safe to re-run to update.
 set -euo pipefail
 
-REPO="https://github.com/minhdonz/perp-dex-fill-analysis.git"
+# Repo is private while pre-launch (PRD P2: open-source deferred) — on the
+# VPS, override with the deploy-key SSH remote:
+#   REPO=git@github.com:minhdonz/perp-dex-fill-analysis.git
+REPO="${REPO:-https://github.com/minhdonz/perp-dex-fill-analysis.git}"
 DIR="$HOME/perp-dex-fill-analysis"
 
 sudo apt-get update -qq
