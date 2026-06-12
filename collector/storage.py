@@ -116,6 +116,8 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
     conn.executescript(SCHEMA)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
+    # collector + rollup cron may write concurrently; wait instead of erroring
+    conn.execute("PRAGMA busy_timeout=10000")
     return conn
 
 

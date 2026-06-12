@@ -1,0 +1,23 @@
+# systemd unit for the collector. Install:
+#   sudo cp deploy/collector.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now collector
+# Adjust User/paths if your username or clone location differs.
+
+[Unit]
+Description=Perp DEX fill collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=minh
+WorkingDirectory=/home/minh/perp-dex-fill-analysis
+ExecStart=/home/minh/perp-dex-fill-analysis/.venv/bin/python -m collector --db data/fills.db
+# The collector flushes and logs a clean shutdown on SIGINT (KeyboardInterrupt);
+# SIGTERM would drop up to ~1s of queued rows.
+KillSignal=SIGINT
+TimeoutStopSec=15
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
