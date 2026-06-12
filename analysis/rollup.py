@@ -19,6 +19,14 @@ from collector.storage import connect
 
 WINDOW_NS = 2 * 3600 * 1_000_000_000
 RETENTION_DAYS = 90
+# Books dominate disk (~50x trades by volume even compressed and throttled to
+# 0.5s), so book retention is tiered: full granularity for BOOK_FULL_DAYS
+# (covers reprocessing questions about the current edition), then thinned to
+# one snapshot/minute per venue+coin out to RETENTION_DAYS (preserves the
+# depth-over-time story), then summaries only. Trades stay full for 90 days —
+# they're small and they're the realized leg of the headline metric.
+BOOK_FULL_DAYS = 21
+BOOK_THIN_INTERVAL_NS = 60 * 1_000_000_000
 GAP_EVENTS = ("disconnect", "gap", "stale")
 
 
@@ -58,6 +66,22 @@ def summarize(conn, now_ns: int) -> int:
     return n
 
 
+def thin_books(conn, now_ns: int) -> int:
+    """Thin book snapshots older than BOOK_FULL_DAYS to one per minute per
+    venue+coin (keep the earliest in each minute)."""
+    cutoff_ns = now_ns - BOOK_FULL_DAYS * 86400 * 1_000_000_000
+    n = conn.execute(
+        f"""
+        DELETE FROM book_snapshots WHERE ts_ns < {cutoff_ns} AND id NOT IN (
+            SELECT MIN(id) FROM book_snapshots WHERE ts_ns < {cutoff_ns}
+            GROUP BY venue, coin, ts_ns / {BOOK_THIN_INTERVAL_NS}
+        )
+        """
+    ).rowcount
+    conn.commit()
+    return n
+
+
 def prune(conn, now_ns: int) -> tuple[int, int]:
     """Drop granular rows older than retention, but never rows whose window
     hasn't been summarized yet."""
@@ -84,9 +108,11 @@ def main() -> None:
     n = summarize(conn, now_ns)
     print(f"summarized/updated {n} venue-coin-window rows")
     if not args.no_prune:
+        thinned = thin_books(conn, now_ns)
         t, b = prune(conn, now_ns)
-        print(f"pruned {t} trades, {b} book snapshots older than {RETENTION_DAYS}d")
-        if t or b:
+        print(f"thinned {thinned} book rows older than {BOOK_FULL_DAYS}d; "
+              f"pruned {t} trades, {b} books older than {RETENTION_DAYS}d")
+        if thinned or t or b:
             conn.execute("VACUUM")
     gaps = conn.execute(
         "SELECT venue, COUNT(*), SUM(has_gap) FROM window_summaries GROUP BY venue"

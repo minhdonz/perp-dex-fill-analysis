@@ -7,6 +7,7 @@ provide it.
 from __future__ import annotations
 
 import json
+import zlib
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -15,6 +16,20 @@ from decimal import Decimal
 def ts_ns_to_date(ts_ns: int) -> str:
     """UTC date partition key (venue/coin/date pruning, spec §5)."""
     return datetime.fromtimestamp(ts_ns / 1e9, tz=timezone.utc).strftime("%Y-%m-%d")
+
+
+def zjson(obj) -> bytes:
+    """JSON columns are zlib-compressed at write time: book/raw JSON dominates
+    disk (~10GB/day uncompressed across 3 venues x 5 assets, measured
+    2026-06-12) and compresses ~4-6x. Read back with unjson()."""
+    return zlib.compress(json.dumps(obj, separators=(",", ":")).encode(), 6)
+
+
+def unjson(val):
+    """Inverse of zjson; also accepts legacy uncompressed TEXT rows."""
+    if isinstance(val, bytes):
+        val = zlib.decompress(val)
+    return json.loads(val)
 
 
 @dataclass(slots=True)
@@ -43,7 +58,7 @@ class TradeRecord:
             self.price, self.size_base, self.notional_usd,
             self.aggressor_side, self.taker_id, self.taker_size_before,
             self.trade_id, int(self.is_liquidation),
-            json.dumps(self.raw, separators=(",", ":")),
+            zjson(self.raw),
             ts_ns_to_date(self.ts_ns),
         )
 
@@ -61,9 +76,9 @@ class BookSnapshot:
     def to_row(self) -> tuple:
         return (
             self.venue, self.coin, self.ts_ns, self.ts_venue_raw,
-            json.dumps(self.bids, separators=(",", ":")),
-            json.dumps(self.asks, separators=(",", ":")),
-            json.dumps(self.raw, separators=(",", ":")),
+            zjson(self.bids),
+            zjson(self.asks),
+            zjson(self.raw),
             ts_ns_to_date(self.ts_ns),
         )
 
@@ -84,6 +99,6 @@ class MarketStats:
         return (
             self.venue, self.coin, self.ts_ns,
             self.funding_rate, self.mark_price, self.index_price,
-            json.dumps(self.raw, separators=(",", ":")),
+            zjson(self.raw),
             ts_ns_to_date(self.ts_ns),
         )

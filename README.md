@@ -90,10 +90,16 @@ deploy/                systemd unit + one-command VPS bootstrap
   Pacifica 200ms sweep heuristic. `--clip-window-ms` flag exists for the
   empirical calibration the spec calls for.
 - **Lighter book emission:** the book channel is snapshot+delta; we maintain
-  state locally and emit a top-50 snapshot row at most every 250ms per market
-  (finer than HL's 0.5s floor; storing every delta would multiply rows for no
-  matching precision). Nonce gaps trigger an integrity `gap` event + fresh
-  resubscribe.
+  state locally and emit a top-50 snapshot row at most every 500ms per market.
+  Nonce gaps trigger an integrity `gap` event + fresh resubscribe.
+- **Storage rate (measured live):** uncapped, books alone ran ~10GB/day
+  across 3 venues x 5 assets — far past the PRD's disk assumption. Fixes:
+  all JSON columns are zlib-compressed (read back via
+  `collector.models.unjson`), book storage is throttled to the methodology's
+  0.5s resolution floor on every venue, and book retention is tiered
+  (full 21 days -> 1/minute to 90 days -> summaries). Measured after fixes:
+  ~2.5-3GB/day during active hours; steady-state disk at full retention
+  ~75-100GB. Trades keep full 90-day raw per the spec decision.
 - **Pacifica REST backfill:** REST trade rows have no trade id, so backfilled
   rows get synthetic ids and the WS/backfill boundary is partitioned strictly
   by timestamp. If REST history doesn't reach back to the disconnect point,

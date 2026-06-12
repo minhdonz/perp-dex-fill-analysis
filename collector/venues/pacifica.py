@@ -29,6 +29,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 
 import aiohttp
 import websockets
@@ -41,6 +42,9 @@ log = logging.getLogger("pacifica")
 WS_URL = "wss://ws.pacifica.fi/ws"
 REST_TRADES = "https://api.pacifica.fi/api/v1/trades"
 PING_INTERVAL_S = 30
+# Pacifica pushes full book snapshots ~4/s; store at the methodology's 0.5s
+# resolution floor (see lighter.py) instead of every push.
+BOOK_EMIT_INTERVAL_MS = 500
 
 BUY_DIRECTIONS = {"open_long", "close_short"}
 SELL_DIRECTIONS = {"open_short", "close_long"}
@@ -61,6 +65,7 @@ class PacificaCollector(VenueCollector):
         super().__init__(store, coins)
         self.last_trade_ms: dict[str, int] = {}     # per coin, for backfill
         self.backfill_until_ms: dict[str, int] = {}  # WS trades <= this are skipped
+        self.last_book_emit: dict[str, float] = {}   # per coin, monotonic ms
 
     async def _run_session(self) -> None:
         await self._backfill_all()
@@ -125,6 +130,10 @@ class PacificaCollector(VenueCollector):
         if coin not in self.coins:
             return
         self.mark(coin, "book")
+        now_ms = time.monotonic() * 1000
+        if now_ms - self.last_book_emit.get(coin, 0.0) < BOOK_EMIT_INTERVAL_MS:
+            return
+        self.last_book_emit[coin] = now_ms
         bids, asks = d["l"]
         self.store.put_book(BookSnapshot(
             venue=self.name,

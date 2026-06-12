@@ -9,12 +9,13 @@ Usage: python -m analysis.spike --db data/spike.db --venue hyperliquid --coin BT
 from __future__ import annotations
 
 import argparse
-import json
 import sqlite3
 from bisect import bisect_right
 from dataclasses import dataclass, field
 from decimal import Decimal
 from statistics import median
+
+from collector.models import unjson
 
 CONFIDENCE = {"lighter": "exact", "hyperliquid": "identity", "pacifica": "heuristic"}
 
@@ -149,7 +150,7 @@ def match_and_measure(conn, clips, tolerance_ms: int):
         bids_j, asks_j = conn.execute(
             "SELECT bids, asks FROM book_snapshots WHERE id=?", (id_list[i],)
         ).fetchone()
-        bids, asks = json.loads(bids_j), json.loads(asks_j)
+        bids, asks = unjson(bids_j), unjson(asks_j)
         if not bids or not asks:
             unmatched += 1
             continue

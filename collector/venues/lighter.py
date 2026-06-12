@@ -40,7 +40,10 @@ log = logging.getLogger("lighter")
 
 WS_URL = "wss://mainnet.zklighter.elliot.ai/stream"
 REST_ORDERBOOKS = "https://mainnet.zklighter.elliot.ai/api/v1/orderBooks"
-BOOK_EMIT_INTERVAL_MS = 250
+# Matches the methodology's resolution floor (HL's ~0.5s book cadence, spec
+# §2.1/§3) — storing finer than the floor costs disk without sharpening the
+# cross-venue comparison.
+BOOK_EMIT_INTERVAL_MS = 500
 BOOK_DEPTH = 50
 
 
