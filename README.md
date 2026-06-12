@@ -43,6 +43,25 @@ window overlapping a disconnect/gap/stale integrity event as `has_gap=1`
 (excluded from published numbers, never silently averaged). Granular rows
 older than 90 days are pruned only after their windows are summarized.
 
+## Deploy to a VPS (one command)
+
+On a fresh Ubuntu 22.04/24.04 box (~$5/month, 1 vCPU / 1GB is plenty):
+
+```bash
+# optional but recommended — free alerting via healthchecks.io:
+export HEALTHCHECK_URL=https://hc-ping.com/<your-uuid>
+curl -fsSL https://raw.githubusercontent.com/minhdonz/perp-dex-fill-analysis/main/deploy/setup.sh | bash
+```
+
+This installs deps, clones the repo, starts the collector under systemd
+(`KillSignal=SIGINT` so stops flush cleanly, `Restart=always`), and adds cron
+entries for the nightly rollup and a 5-minute liveness healthcheck
+(`scripts/healthcheck.py` — flags any venue whose book feed is >5 min silent
+or trade feed >60 min silent, and pings/fails the heartbeat URL so you get an
+alert within minutes, per PRD §8.1). Re-running the script updates the deploy.
+
+Watch it: `journalctl -u collector -f`
+
 ## Layout
 
 ```
@@ -57,6 +76,8 @@ analysis/
   spike.py             clip reconstruction + advertised-vs-realized gap (§4, §7)
   rollup.py            2h-window summaries, gap marking, 90d retention (§5, §6)
 scripts/probe_ws.py    one-off payload probe used during the spike
+scripts/healthcheck.py cron liveness check + heartbeat ping (PRD §8.1)
+deploy/                systemd unit + one-command VPS bootstrap
 ```
 
 ## Decisions made during the build (spec §8 open items)
