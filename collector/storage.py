@@ -37,10 +37,13 @@ CREATE TABLE IF NOT EXISTS trades (
     is_liquidation INTEGER NOT NULL DEFAULT 0,
     raw TEXT NOT NULL,
     date TEXT NOT NULL,
+    taker_order_id TEXT,   -- exact clip key where exposed (Lighter); see models.py
     PRIMARY KEY (venue, trade_id)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS idx_trades_vct ON trades (venue, coin, ts_ns);
 CREATE INDEX IF NOT EXISTS idx_trades_date ON trades (venue, coin, date);
+-- idx_trades_order is created in _migrate (after the column is guaranteed on
+-- older DBs), not here, so executescript doesn't reference a not-yet-added column.
 
 CREATE TABLE IF NOT EXISTS book_snapshots (
     id INTEGER PRIMARY KEY,
@@ -100,7 +103,12 @@ CREATE TABLE IF NOT EXISTS window_summaries (
 );
 """
 
-INSERT_TRADE = """INSERT OR IGNORE INTO trades VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"""
+# explicit column list so to_row() order is the single source of truth
+INSERT_TRADE = """INSERT OR IGNORE INTO trades
+    (venue, coin, ts_ns, ts_venue_raw, price, size_base, notional_usd,
+     aggressor_side, taker_id, taker_size_before, trade_id, is_liquidation,
+     raw, date, taker_order_id)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"""
 INSERT_BOOK = """INSERT INTO book_snapshots
     (venue, coin, ts_ns, ts_venue_raw, bids, asks, raw, date) VALUES (?,?,?,?,?,?,?,?)"""
 INSERT_STATS = """INSERT INTO market_stats
@@ -110,10 +118,21 @@ INSERT_INTEGRITY = """INSERT INTO integrity_log (ts_ns, venue, coin, feed, event
     VALUES (?,?,?,?,?,?)"""
 
 
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Idempotent in-place migrations for DBs created before a column existed.
+    ADD COLUMN is instant and non-locking under WAL."""
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(trades)")}
+    if "taker_order_id" not in cols:
+        conn.execute("ALTER TABLE trades ADD COLUMN taker_order_id TEXT")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_order "
+                 "ON trades (venue, coin, taker_order_id)")
+
+
 def connect(db_path: str | Path) -> sqlite3.Connection:
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     conn.executescript(SCHEMA)
+    _migrate(conn)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     # collector + rollup cron may write concurrently; wait instead of erroring

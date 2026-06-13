@@ -123,6 +123,14 @@ class LighterCollector(VenueCollector):
         is_maker_ask = t.get("is_maker_ask")
         side = None if is_maker_ask is None else ("buy" if is_maker_ask else "sell")
         taker_acct = t.get("bid_account_id") if side == "buy" else t.get("ask_account_id")
+        # taker's order id = the bid/ask order on the taker side; constant across
+        # all fills of one market order (verified live) → exact clip key (§5.2).
+        if side == "buy":
+            taker_order = t.get("bid_id_str") or t.get("bid_id")
+        elif side == "sell":
+            taker_order = t.get("ask_id_str") or t.get("ask_id")
+        else:
+            taker_order = None
         tx_us = t.get("transaction_time")
         if tx_us:
             ts_ns, ts_raw = int(tx_us) * 1_000, str(tx_us)
@@ -146,6 +154,7 @@ class LighterCollector(VenueCollector):
             trade_id=str(t.get("trade_id_str") or t["trade_id"]),
             is_liquidation=liq,
             raw=t,
+            taker_order_id=str(taker_order) if taker_order is not None else None,
         ))
 
     # -- order book ---------------------------------------------------------

@@ -47,12 +47,17 @@ class TradeRecord:
     trade_id: str
     is_liquidation: bool
     raw: dict
+    # Taker's order id (one market order, all its fills) where the venue exposes
+    # it. Lighter only (bid_id/ask_id) — the exact, window-free clip key for the
+    # marquee §5.2 method. NULL on HL/Pacifica (no public order id).
+    taker_order_id: str | None = None
 
     @staticmethod
     def notional(price: str, size_base: str) -> str:
         return str(Decimal(price) * Decimal(size_base))
 
     def to_row(self) -> tuple:
+        # column order must match storage.INSERT_TRADE
         return (
             self.venue, self.coin, self.ts_ns, self.ts_venue_raw,
             self.price, self.size_base, self.notional_usd,
@@ -60,6 +65,7 @@ class TradeRecord:
             self.trade_id, int(self.is_liquidation),
             zjson(self.raw),
             ts_ns_to_date(self.ts_ns),
+            self.taker_order_id,
         )
 
 
