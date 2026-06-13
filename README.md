@@ -73,12 +73,40 @@ collector/
   venues/lighter.py      trades + book deltas w/ nonce continuity + market_stats (§2.2)
   venues/pacifica.py     trades + book + REST backfill after disconnect (§2.3)
 analysis/
-  spike.py             clip reconstruction + advertised-vs-realized gap (§4, §7)
+  reconstruct.py       canonical clip reconstruction + gap measurement library
+  league.py            cross-venue league table — PRD §6.1 "The Gap" (headline)
+  clips.py             single-venue calibration + grouping audit + gap
+  spike.py             original BTC spike (superseded by reconstruct/clips)
   rollup.py            2h-window summaries, gap marking, 90d retention (§5, §6)
 scripts/probe_ws.py    one-off payload probe used during the spike
 scripts/healthcheck.py cron liveness check + heartbeat ping (PRD §8.1)
+scripts/backfill_taker_order_id.py  one-time Lighter order-id backfill
 deploy/                systemd unit + one-command VPS bootstrap
 ```
+
+## Analysis pipeline (the product)
+
+```bash
+# The headline: advertised vs realized gap, venues ranked per rung, all assets
+.venv/bin/python -m analysis.league --db data/fills.db --hours 6
+
+# Single-venue calibration + grouping audit (per-clip detail)
+.venv/bin/python -m analysis.clips --db data/fills.db --venue lighter --coin BTC --hours 4
+```
+
+**Clip reconstruction is venue-aware, by what each feed exposes (PRD §5.2):**
+
+| Venue | Method | Confidence | Clip key |
+|---|---|---|---|
+| Lighter | exact | `exact` | **taker order id** (`bid_id`/`ask_id`) — one market order = one id across all its fills; window-free. Verified live: 100% coverage, fills tens of µs apart, orders seconds apart. |
+| Hyperliquid | identity | `identity` | taker address (`users[]`) + direction within a time window (no public order id; prints share one ms timestamp, so the 150ms window is insensitive) |
+| Pacifica | heuristic | `heuristic` | sweep of consecutive same-direction prints (no taker id at all) |
+
+`taker_position_size_before` (Lighter) chains per-fill as a running position —
+useful for §5.3 hold-length/funding work, but it does **not** delimit orders
+(it never resets); the order id does. Every league-table cell carries its
+confidence label and sample count; sparse cells (n below `--min-samples`) are
+shown but de-ranked so a quiet rung can't claim a misleading #1.
 
 ## Decisions made during the build (spec §8 open items)
 
