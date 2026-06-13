@@ -1,13 +1,21 @@
 """Cross-venue league table — PRD §6.1 "The Gap" (the P0 product headline).
 
-For each asset and clip-size rung, rank venues by realized execution cost and
-show advertised vs realized vs the gap (bps), with the sample count and
-confidence label on every cell. Honest seams per PRD §11 / spec §9:
-  - sparse cells (n < --min-samples) are shown with their count, never hidden
-    or smoothed into a fabricated number;
-  - a venue only appears for assets it lists / we observed;
-  - per-venue coverage (unmatched, exceeds-visible-depth) is reported so a
-    thin-book venue isn't silently compared at a size its book can't show.
+For each asset and clip-size rung: each venue's advertised vs realized cost
+(bps), the gap, sample count, and confidence label. The leader (► cheapest
+realized) is chosen only among cells that can be trusted and compared:
+
+  - "sparse"  (n < --min-samples): shown for transparency, never ranked.
+  - "beats book?" (gap < −0.15 bps): realized implausibly beat the advertised
+    book — a stale/near-concurrent book-match artifact, not real price
+    improvement. Flagged, not ranked. (Real fix: tighten the match to strictly
+    prior + minimum age — pending.)
+  - "at touch" (advertised ≈ the venue's half-spread floor): the clip fills at
+    the best level, so the cost is the spread (tick-limited). Still rankable —
+    a venue that absorbs size at the touch genuinely is cheapest — but if two
+    venues tie at the touch the lead is marked "≈tie" so noise isn't a winner.
+
+Coverage footer reports per-venue unmatched + depth-cut so a thin-book venue
+isn't silently compared at a size its book can't show (PRD §11 / spec §9).
 
 Usage:
   python -m analysis.league --db data/fills.db --hours 6
@@ -22,11 +30,15 @@ from statistics import median
 
 from analysis.reconstruct import (
     METHOD, RUNGS, BookMatcher, group_clips, load_trades, measure, rung_for,
+    touch_floor_bps,
 )
 
 ALL_VENUES = ["hyperliquid", "lighter", "pacifica"]
 ALL_ASSETS = ["BTC", "ETH", "SOL", "HYPE", "ZEC"]
 CONF_TAG = {"exact": "exact", "identity": "ident", "heuristic": "heur"}
+FLOOR_MULT = 1.5      # cost within this x the touch floor counts as "at the floor"
+EGREGIOUS_NEG = 0.5   # gap below this (bps) is non-physical => artifact
+TIE_EPS = 0.03        # leaders within this (bps) of each other => "≈tie"
 
 
 def rung_label(r: int) -> str:
@@ -34,8 +46,6 @@ def rung_label(r: int) -> str:
 
 
 def collect(conn, venue, coin, since_ns, window_ms):
-    """Return (per_rung measurements, coverage dict). per_rung: rung -> list of
-    measure() dicts. coverage: counts of clips, measured, skip reasons."""
     rows = load_trades(conn, venue, coin, since_ns)
     cov = {"prints": len(rows), "clips": 0, "measured": 0, "skips": {}}
     per_rung: dict[int, list] = {}
@@ -56,6 +66,35 @@ def collect(conn, venue, coin, since_ns, window_ms):
     return per_rung, cov
 
 
+def build_cell(venue, ms, floor, min_samples):
+    real = median(x["realized_bps"] for x in ms)
+    adv = median(x["advertised_bps"] for x in ms)
+    n = len(ms)
+    gap = real - adv
+    sparse = n < min_samples
+    touch_adv = floor is not None and adv <= floor * FLOOR_MULT  # book says it fits at L1
+    touch_real = floor is not None and real <= floor * FLOOR_MULT
+    # Artifact: realized came back at the touch floor while the book advertised
+    # real depth cost (the matched book is post-trade), or a non-physical gap.
+    suspect = (touch_real and not touch_adv) or gap < -EGREGIOUS_NEG or real < -0.10
+    return {
+        "venue": venue, "conf": CONF_TAG[METHOD[venue]], "n": n,
+        "real": real, "adv": adv, "gap": gap,
+        "age": median(x["book_age_ms"] for x in ms),
+        "at_touch": touch_adv,
+        "sparse": sparse, "suspect": suspect,
+        "rankable": not sparse and not suspect,
+    }
+
+
+def display_order(cells):
+    # rankable (by realized) first, then suspect, then sparse
+    def k(c):
+        bucket = 0 if c["rankable"] else (1 if c["suspect"] else 2)
+        return (bucket, c["real"])
+    return sorted(cells, key=k)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--db", default="data/fills.db")
@@ -69,84 +108,85 @@ def main() -> None:
     conn = sqlite3.connect(args.db)
     since_ns = int((time.time() - args.hours * 3600) * 1e9)
 
-    print(f"\nLEAGUE TABLE — advertised vs realized execution cost (bps)")
+    print("\nLEAGUE TABLE — advertised vs realized execution cost (bps)")
     print(f"window: last {args.hours:.0f}h   clip-window(HL/Pac): {args.window_ms}ms   "
-          f"sparse threshold: n<{args.min_samples}")
-    print("gap = realized − advertised (+ = filled worse than the book advertised)")
+          f"sparse: n<{args.min_samples}")
+    print("gap = realized − advertised  (+ = filled worse than the book advertised)")
 
     coverage_all = {}
+    hdr = (f"  {'rung':>5}  {'':1} {'venue':<12} {'conf':>5} {'n':>5} "
+           f"{'real':>6} {'adv':>6} {'gap':>6} {'age':>5}  note")
+
     for coin in args.assets:
-        data = {}
+        data, floors = {}, {}
         for v in args.venues:
             per_rung, cov = collect(conn, v, coin, since_ns, args.window_ms)
             data[v] = per_rung
             coverage_all[(coin, v)] = cov
+            floors[v] = touch_floor_bps(conn, v, coin, since_ns)
 
         eligible = [v for v in args.venues if coverage_all[(coin, v)]["prints"] > 0]
         if not eligible:
             continue
-        print("\n" + "=" * 78)
-        print(f"{coin}   (venues observed: {', '.join(eligible)})")
-        print("=" * 78)
+        floor_str = "  ".join(
+            f"{v} {floors[v]:.2f}" for v in eligible if floors[v] is not None)
+        print("\n" + "═" * 78)
+        print(f" {coin}    touch floor (bps): {floor_str}")
+        print("═" * 78)
+        print(hdr)
 
         for rung in RUNGS:
-            # one cell per eligible venue at this rung
-            cells = []
-            for v in eligible:
-                ms = data[v].get(rung)
-                if not ms:
-                    continue
-                real_med = median(x["realized_bps"] for x in ms)
-                adv_med = median(x["advertised_bps"] for x in ms)
-                # gap = difference of the displayed marginals, so the table is
-                # arithmetically self-consistent and matches the quotable claim
-                # ("advertises adv, fills real"). Paired per-clip gap is a
-                # separate statistic used in the calibration tool, not here.
-                cells.append({
-                    "venue": v,
-                    "conf": CONF_TAG[METHOD[v]],
-                    "n": len(ms),
-                    "real": real_med,
-                    "adv": adv_med,
-                    "gap": real_med - adv_med,
-                    "age": median(x["book_age_ms"] for x in ms),
-                })
+            cells = [build_cell(v, data[v][rung], floors[v], args.min_samples)
+                     for v in eligible if data[v].get(rung)]
             if not cells:
                 continue
-            # rank by realized cost (cheapest first), but sparse cells always
-            # sort below well-sampled ones so a 3-sample outlier can't claim #1
-            # (PRD §11: show the count, never let a quiet rung manufacture a rank)
-            cells.sort(key=lambda c: (c["n"] < args.min_samples, c["real"]))
-            print(f"\n  {rung_label(rung):>6} rung      "
-                  f"{'venue':<12} {'conf':>6} {'n':>5} "
-                  f"{'real':>7} {'adv':>7} {'gap':>7} {'age ms':>7}")
-            for rank, c in enumerate(cells, 1):
-                sparse = "  (sparse)" if c["n"] < args.min_samples else ""
-                print(f"  {'':>6}      #{rank}  {c['venue']:<12} {c['conf']:>6} "
-                      f"{c['n']:>5} {c['real']:>7.2f} {c['adv']:>7.2f} "
-                      f"{c['gap']:>+7.2f} {c['age']:>7.0f}{sparse}")
+            rankable = sorted((c for c in cells if c["rankable"]), key=lambda c: c["real"])
+            leader = rankable[0] if rankable else None
+            tie = (leader is not None and len(rankable) > 1
+                   and rankable[1]["real"] - leader["real"] < TIE_EPS)
 
-    # methodology / coverage footer (book-depth comparability, PRD §11)
-    print("\n" + "=" * 78)
-    print("COVERAGE & CONFIDENCE  (per venue, across the assets above)")
-    print("=" * 78)
+            label = rung_label(rung)
+            for c in display_order(cells):
+                is_leader = c is leader
+                mark = "►" if is_leader else " "
+                notes = []
+                if is_leader:
+                    notes.append("cheapest at size" + (" (≈tie)" if tie else ""))
+                if c["at_touch"]:
+                    notes.append("at touch")
+                if c["suspect"]:
+                    notes.append("beats book?")
+                if c["sparse"]:
+                    notes.append("sparse")
+                note = ("· " + ", ".join(notes)) if notes else ""
+                print(f"  {label:>5}  {mark:1} {c['venue']:<12} {c['conf']:>5} "
+                      f"{c['n']:>5} {c['real']:>6.2f} {c['adv']:>6.2f} "
+                      f"{c['gap']:>+6.2f} {c['age']:>5.0f}  {note}")
+                label = ""  # rung label only on the block's first row
+
+    print("\n" + "═" * 78)
+    print(" COVERAGE & CONFIDENCE  (per venue, across the assets above)")
+    print("═" * 78)
     print(f"  {'venue':<12} {'method':>10} {'clips':>8} {'measured':>9} "
           f"{'unmatched':>10} {'depth-cut':>10}")
     for v in args.venues:
-        clips = sum(c["clips"] for (cn, vv), c in coverage_all.items() if vv == v)
-        meas = sum(c["measured"] for (cn, vv), c in coverage_all.items() if vv == v)
-        unm = sum(c["skips"].get("no book within 1s", 0) + c["skips"].get("empty book", 0)
-                  for (cn, vv), c in coverage_all.items() if vv == v)
-        depth = sum(c["skips"].get("exceeds visible depth", 0)
-                    for (cn, vv), c in coverage_all.items() if vv == v)
+        c = [cov for (cn, vv), cov in coverage_all.items() if vv == v]
+        clips = sum(x["clips"] for x in c)
         if clips == 0:
             continue
-        print(f"  {v:<12} {METHOD[v]:>10} {clips:>8} {meas:>9} "
-              f"{unm:>10} {depth:>10}")
-    print("\n  exact=Lighter order id · identity=HL taker addr+window · "
-          "heuristic=Pacifica sweep")
-    print("  depth-cut = clips larger than the venue's visible book "
-          "(excluded, not extrapolated)")
+        meas = sum(x["measured"] for x in c)
+        unm = sum(x["skips"].get("no book within 1s", 0)
+                  + x["skips"].get("empty book", 0) for x in c)
+        depth = sum(x["skips"].get("exceeds visible depth", 0) for x in c)
+        print(f"  {v:<12} {METHOD[v]:>10} {clips:>8} {meas:>9} {unm:>10} {depth:>10}")
+
+    print("\n  ► cheapest realized among trustworthy, comparable cells")
+    print("  at touch    = clip fills at the best level; cost is the spread (tick-limited)")
+    print("  beats book? = realized beat the advertised book by >0.15bps — likely a stale")
+    print("                book-match artifact, not real edge; flagged, not ranked")
+    print("  sparse      = n below threshold; shown for transparency, never ranked")
+    print("  depth-cut   = clips larger than the venue's visible book (excluded, not extrapolated)")
+    print("  conf: exact=Lighter order id · ident=HL taker addr+window · heur=Pacifica sweep")
 
 
 if __name__ == "__main__":

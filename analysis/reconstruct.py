@@ -191,6 +191,30 @@ class BookMatcher:
         return unjson(bids_b), unjson(asks_b), (start_ns - self.ts[i]) / 1e6
 
 
+def touch_floor_bps(conn, venue, coin, since_ns, sample=400):
+    """Median half-spread (bps) from recent book snapshots = the cost of a clip
+    that fills at the best level without consuming depth. Below this, the metric
+    can't separate venues on execution quality — the number is just the spread
+    (tick-limited). Used to flag 'at touch' cells in the league table."""
+    rows = conn.execute(
+        "SELECT bids, asks FROM book_snapshots WHERE venue=? AND coin=? AND ts_ns>=? "
+        "ORDER BY ts_ns DESC LIMIT ?", (venue, coin, since_ns, sample)
+    ).fetchall()
+    hs = []
+    for b, a in rows:
+        bids, asks = unjson(b), unjson(a)
+        if not bids or not asks:
+            continue
+        bb, ba = Decimal(bids[0][0]), Decimal(asks[0][0])
+        if ba <= bb:
+            continue
+        hs.append(float((ba - bb) / 2 / ((bb + ba) / 2) * 10_000))
+    if not hs:
+        return None
+    hs.sort()
+    return hs[len(hs) // 2]
+
+
 def measure(clip: Clip, matcher: BookMatcher):
     """advertised/realized/gap bps + book_age_ms, or {'skip': reason}."""
     m = matcher.match(clip.start_ns)
