@@ -182,8 +182,8 @@ def main() -> None:
 
     print("\n  ► cheapest realized among trustworthy, comparable cells")
     print("  at touch    = clip fills at the best level; cost is the spread (tick-limited)")
-    print("  beats book? = realized beat the advertised book by >0.15bps — likely a stale")
-    print("                book-match artifact, not real edge; flagged, not ranked")
+    print("  beats book? = realized pinned at the touch floor while the book advertised")
+    print("                depth (post-trade match), or gap < -0.5bps — artifact, not ranked")
     print("  sparse      = n below threshold; shown for transparency, never ranked")
     print("  depth-cut   = clips larger than the venue's visible book (excluded, not extrapolated)")
     print("  conf: exact=Lighter order id · ident=HL taker addr+window · heur=Pacifica sweep")
