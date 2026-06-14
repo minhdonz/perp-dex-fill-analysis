@@ -44,6 +44,7 @@ crontab -l 2>/dev/null | grep -v 'perp-dex-fill-analysis' > "$TMP" || true
     cat "$TMP"
     echo "15 0 * * * cd $DIR && .venv/bin/python -m analysis.rollup --db data/fills.db >> rollup.log 2>&1  # perp-dex-fill-analysis"
     echo "*/5 * * * * cd $DIR && .venv/bin/python scripts/healthcheck.py --db data/fills.db${HEALTHCHECK_URL:+ --ping $HEALTHCHECK_URL} >> healthcheck.log 2>&1  # perp-dex-fill-analysis"
+    echo "30 2 * * * cd $DIR && .venv/bin/python scripts/fetch_hl_fees.py data/fills.db --top 500 >> fees.log 2>&1  # perp-dex-fill-analysis"
 } | crontab -
 rm -f "$TMP"
 

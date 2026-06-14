@@ -92,7 +92,26 @@ deploy/                systemd unit + one-command VPS bootstrap
 
 # Single-venue calibration + grouping audit (per-clip detail)
 .venv/bin/python -m analysis.clips --db data/fills.db --venue lighter --coin BTC --hours 4
+
+# Net cost to execute = slippage + taker fee (entry vs round-trip side by side)
+.venv/bin/python scripts/fetch_hl_fees.py data/fills.db --top 500   # refresh real HL fees
+.venv/bin/python -m analysis.cost --db data/fills.db --hours 6                 # observed real rates
+.venv/bin/python -m analysis.cost --db data/fills.db --volume 200e6           # price your own HL tier
 ```
+
+**Fees (Phase 1 of "true cost", PRD §5.3) are real where the venue exposes them:**
+
+| Venue | Fee source | Assumption? |
+|---|---|---|
+| Hyperliquid | **real per-account** via public `userFees` (cached), or the published tier ladder for a fund's stated `--volume` | none — the account's actual rate, or the fund's own volume |
+| Lighter | published schedule (no public fee API) | flagged `‡` unconfirmed until checked vs docs |
+| Pacifica | none encoded yet (no public fee API, no taker id) | shown as `—` |
+
+The headline this surfaces: **fees dominate and flip the ranking.** Hyperliquid
+is cheapest on raw slippage (~0.08 bps at the touch) but far pricier on *net*
+cost once its real ~1.4–4.5 bps taker fee (volume-tier dependent) is included —
+30–60× the slippage. "Cheapest to quote" and "cheapest to actually trade" are
+different answers. Funding (the third leg) is **Phase 2**.
 
 **Clip reconstruction is venue-aware, by what each feed exposes (PRD §5.2):**
 
