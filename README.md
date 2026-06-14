@@ -93,11 +93,25 @@ deploy/                systemd unit + one-command VPS bootstrap
 # Single-venue calibration + grouping audit (per-clip detail)
 .venv/bin/python -m analysis.clips --db data/fills.db --venue lighter --coin BTC --hours 4
 
-# Net cost to execute = slippage + taker fee (entry vs round-trip side by side)
+# Net cost to execute + hold = slippage + taker fee + funding (entry vs round-trip)
 .venv/bin/python scripts/fetch_hl_fees.py data/fills.db --top 500   # refresh real HL fees
-.venv/bin/python -m analysis.cost --db data/fills.db --hours 6                 # observed real rates
-.venv/bin/python -m analysis.cost --db data/fills.db --volume 200e6           # price your own HL tier
+.venv/bin/python scripts/fetch_funding.py data/fills.db --days 14   # refresh funding rates
+.venv/bin/python -m analysis.cost --db data/fills.db --volume 200e6 --hold-days 7 --side long
 ```
+
+**Funding (Phase 2, PRD §5.3) — the fund SETS the hold length, so no hold
+attribution is needed.** All three venues settle funding hourly, but the rate
+units differ (verified): HL/Pacifica publish a fraction/hour, **Lighter
+publishes percent/hour (÷100)** — a 100× trap if missed. Rates are a trailing
+14-day average per venue+asset, normalized to a fraction/hour, validated by
+cross-venue agreement (BTC funding HL +8.0% vs Lighter +7.1% APR). Funding is
+signed: `+` you pay, `−` you're paid (e.g. ZEC's deeply negative funding pays
+you to hold long).
+
+**The crossover this surfaces:** fees dominate net cost for short holds, but
+funding dominates for multi-day holds — and the cheapest venue *changes* with
+hold length. On a 7-day BTC long, Pacifica wins (low funding) where Lighter
+won on entry. "Cheapest to enter" ≠ "cheapest to hold."
 
 **Fees (Phase 1 of "true cost", PRD §5.3) are real where the venue exposes them:**
 
