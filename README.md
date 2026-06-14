@@ -110,8 +110,14 @@ you to hold long).
 
 **The crossover this surfaces:** fees dominate net cost for short holds, but
 funding dominates for multi-day holds — and the cheapest venue *changes* with
-hold length. On a 7-day BTC long, Pacifica wins (low funding) where Lighter
-won on entry. "Cheapest to enter" ≠ "cheapest to hold."
+hold length. "Cheapest to enter" ≠ "cheapest to hold."
+
+**Funding stability** (`funding_rates.flip_rate`, `pct_positive`): the mean
+alone is misleading — a low average is only useful if it's dependable. We store
+how often funding flips sign (high = unstable/unpredictable carry, e.g. SOL
+~16%/hr) and how persistently one-directional it is (e.g. HYPE ~98% positive =
+reliably costs longs). Shown as `flip%` in the cost view header so a desk sees
+the carry's reliability, not just its average.
 
 **Fees (Phase 1 of "true cost", PRD §5.3) are real where the venue exposes them:**
 
