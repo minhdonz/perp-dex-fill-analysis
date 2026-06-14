@@ -26,6 +26,7 @@ PACIFICA_HIST = "https://api.pacifica.fi/api/v1/funding_rate/history"
 LIGHTER_ORDERBOOKS = "https://mainnet.zklighter.elliot.ai/api/v1/orderBooks"
 LIGHTER_FUNDINGS = "https://mainnet.zklighter.elliot.ai/api/v1/fundings"
 ASSETS = ["BTC", "ETH", "SOL", "HYPE", "ZEC"]
+WINDOW_NS = 2 * 3600 * 1_000_000_000  # 2h funding-window bucket
 
 
 def _get(url, timeout=15):
@@ -40,17 +41,19 @@ def _post(url, payload, timeout=15):
         return json.load(r)
 
 
+# each fetcher returns chronological (ts_ns, fraction/hr) pairs
+
 def hl_hourly(coin, start_ms):
     d = _post(HL_INFO, {"type": "fundingHistory", "coin": coin, "startTime": start_ms})
-    d.sort(key=lambda x: x["time"])  # chronological for flip-rate
-    return [float(x["fundingRate"]) for x in d]  # fraction/hr
+    d.sort(key=lambda x: x["time"])
+    return [(int(x["time"]) * 1_000_000, float(x["fundingRate"])) for x in d]
 
 
 def pacifica_hourly(coin, limit):
     url = f"{PACIFICA_HIST}?{urllib.parse.urlencode({'symbol': coin, 'limit': limit})}"
     d = _get(url).get("data") or []
     d.sort(key=lambda x: int(x["created_at"]))  # endpoint returns newest-first
-    return [float(x["funding_rate"]) for x in d]  # fraction/hr
+    return [(int(x["created_at"]) * 1_000_000, float(x["funding_rate"])) for x in d]
 
 
 def lighter_market_ids():
@@ -64,22 +67,29 @@ def lighter_hourly(market_id, start_s, end_s, count_back):
         "start_timestamp": start_s, "end_timestamp": end_s, "count_back": count_back})
     d = _get(f"{LIGHTER_FUNDINGS}?{q}")
     fundings = sorted(d.get("fundings", []), key=lambda f: f["timestamp"])
-    # Lighter 'rate' is PERCENT/hr -> ÷100; 'direction' sets sign
     out = []
     for f in fundings:
-        rate = float(f["rate"]) / 100.0
+        rate = float(f["rate"]) / 100.0  # Lighter 'rate' is PERCENT/hr -> ÷100
         if f.get("direction") == "short":
             rate = -rate
-        out.append(rate)
+        out.append((int(f["timestamp"]) * 1_000_000_000, rate))
     return out
 
 
-def store(conn, venue, coin, rates, days):
-    if not rates:
+def store(conn, venue, coin, pairs, days):
+    """pairs: chronological (ts_ns, fraction/hr). Writes the trailing-window
+    snapshot (funding_rates) and the per-2h-window series (funding_windows)."""
+    if not pairs:
         print(f"  {venue}/{coin}: no samples")
         return
+    rates = [r for _, r in pairs]
     mean_hourly, pct_pos, flip_rate, std = stability(rates)
     apr = mean_hourly * HOURS_PER_YEAR
+    # bucket into 2h windows -> mean per window
+    buckets: dict[int, list[float]] = {}
+    for ts, r in pairs:
+        buckets.setdefault((ts // WINDOW_NS) * WINDOW_NS, []).append(r)
+    win_rows = [(venue, coin, w, sum(v) / len(v), len(v)) for w, v in buckets.items()]
     with conn:
         conn.execute(
             "INSERT OR REPLACE INTO funding_rates "
@@ -87,8 +97,12 @@ def store(conn, venue, coin, rates, days):
             " n_samples, window_days, fetched_ns) VALUES (?,?,?,?,?,?,?,?,?,?)",
             (venue, coin, mean_hourly, apr, pct_pos, flip_rate, std,
              len(rates), days, time.time_ns()))
+        conn.executemany(
+            "INSERT OR REPLACE INTO funding_windows "
+            "(venue, coin, window_start_ns, mean_hourly, n_hours) VALUES (?,?,?,?,?)",
+            win_rows)
     print(f"  {venue:<11} {coin:<5} APR={apr*100:+6.2f}%  flip={flip_rate*100:3.0f}%  "
-          f"pos={pct_pos*100:3.0f}%  n={len(rates)}")
+          f"pos={pct_pos*100:3.0f}%  n={len(rates)}  windows={len(win_rows)}")
 
 
 def main() -> None:

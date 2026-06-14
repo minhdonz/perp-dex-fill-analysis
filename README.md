@@ -75,9 +75,13 @@ collector/
 analysis/
   reconstruct.py       canonical clip reconstruction + gap measurement library
   league.py            cross-venue league table — PRD §6.1 "The Gap" (headline)
+  cost.py              net cost (slippage+fee+funding), entry vs round-trip — §5.3
+  history.py           time-series net cost: daily + 12 session windows (P1, the moat)
+  fees.py / funding.py / netcost.py   fee + funding models + shared net-cost math
+  gap_rollup.py        per-window gap precompute -> gap_windows (before book thinning)
   clips.py             single-venue calibration + grouping audit + gap
   spike.py             original BTC spike (superseded by reconstruct/clips)
-  rollup.py            2h-window summaries, gap marking, 90d retention (§5, §6)
+  rollup.py            2h summaries + gap_rollup + gap marking + 90d retention (§5, §6)
 scripts/probe_ws.py    one-off payload probe used during the spike
 scripts/healthcheck.py cron liveness check + heartbeat ping (PRD §8.1)
 scripts/backfill_taker_order_id.py  one-time Lighter order-id backfill
@@ -97,7 +101,18 @@ deploy/                systemd unit + one-command VPS bootstrap
 .venv/bin/python scripts/fetch_hl_fees.py data/fills.db --top 500   # refresh real HL fees
 .venv/bin/python scripts/fetch_funding.py data/fills.db --days 14   # refresh funding rates
 .venv/bin/python -m analysis.cost --db data/fills.db --volume 200e6 --hold-days 7 --side long
+
+# Net cost OVER TIME — daily trend + 12 Asia/EU/US session windows (the moat, P1)
+.venv/bin/python -m analysis.history --db data/fills.db --assets BTC --rung 100000 --volume 200e6 --hold-days 7
 ```
+
+**The time dimension (PRD P1 / G3 — "history is the product").** `gap_rollup.py`
+precomputes the advertised-vs-realized gap per 2h window per clip-rung into
+`gap_windows`, and `fetch_funding.py` fills `funding_windows` — because the gap
+**can't be recomputed once books are thinned** (21d). `history.py` then reads
+those tables to show net cost evolving by day and by the 12 session windows
+(time-of-day fairness, §5.4), excluding gap-marked windows. The precompute runs
+inside the daily `rollup.py`, before thinning. Value compounds as history accrues.
 
 **Funding (Phase 2, PRD §5.3) — the fund SETS the hold length, so no hold
 attribution is needed.** All three venues settle funding hourly, but the rate

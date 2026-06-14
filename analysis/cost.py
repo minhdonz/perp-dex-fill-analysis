@@ -24,6 +24,7 @@ import time
 from statistics import median
 
 from analysis import fees, funding
+from analysis.netcost import net_cost
 from analysis.reconstruct import (
     METHOD, RUNGS, BookMatcher, group_clips, load_trades, measure, rung_for,
 )
@@ -130,8 +131,7 @@ def main() -> None:
                 slip = median(s for s, _ in ms)
                 fee, basis = venue_fee_bps(conn, v, [k for _, k in ms], args.volume)
                 fb = fund[v][0] or 0.0
-                entry = slip + fee
-                rt = 2 * entry + fb
+                entry, rt = net_cost(slip, fee, fb)
                 cells.append((v, n, slip, fee, fb, entry, rt, basis))
             if not cells:
                 continue

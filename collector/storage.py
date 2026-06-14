@@ -101,6 +101,35 @@ CREATE TABLE IF NOT EXISTS window_summaries (
     gap_detail TEXT,
     PRIMARY KEY (venue, coin, window_start_ns)
 );
+
+-- Per-window advertised-vs-realized gap by clip-size rung (PRD P1 time series).
+-- Precomputed by analysis/gap_rollup.py BEFORE books are thinned (rollup.py),
+-- because the gap can't be recomputed at fidelity once books are thinned.
+CREATE TABLE IF NOT EXISTS gap_windows (
+    venue TEXT NOT NULL,
+    coin TEXT NOT NULL,
+    window_start_ns INTEGER NOT NULL,   -- UTC, 2h-aligned
+    rung INTEGER NOT NULL,              -- clip-size rung ($ notional)
+    n_clips INTEGER NOT NULL,
+    med_advertised_bps REAL,
+    med_realized_bps REAL,
+    med_gap_bps REAL,
+    med_book_age_ms REAL,
+    has_gap INTEGER NOT NULL DEFAULT 0, -- carried from window_summaries
+    PRIMARY KEY (venue, coin, window_start_ns, rung)
+);
+CREATE INDEX IF NOT EXISTS idx_gapwin ON gap_windows (venue, coin, rung, window_start_ns);
+
+-- Per-window funding rate (normalized fraction/hr). Populated by
+-- scripts/fetch_funding.py from each venue's funding history (Lighter ÷100).
+CREATE TABLE IF NOT EXISTS funding_windows (
+    venue TEXT NOT NULL,
+    coin TEXT NOT NULL,
+    window_start_ns INTEGER NOT NULL,   -- UTC, 2h-aligned
+    mean_hourly REAL NOT NULL,          -- fraction of notional per hour
+    n_hours INTEGER NOT NULL,
+    PRIMARY KEY (venue, coin, window_start_ns)
+);
 """
 
 # explicit column list so to_row() order is the single source of truth

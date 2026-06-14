@@ -81,12 +81,19 @@ class Clip:
         return (self.end_ns - self.start_ns) / 1e6
 
 
-def load_trades(conn, venue: str, coin: str, since_ns: int):
+def load_trades(conn, venue: str, coin: str, since_ns: int, until_ns: int | None = None):
+    if until_ns is None:
+        return conn.execute(
+            "SELECT ts_ns, price, size_base, aggressor_side, taker_id, trade_id, taker_order_id "
+            "FROM trades WHERE venue=? AND coin=? AND is_liquidation=0 AND ts_ns>=? "
+            "ORDER BY ts_ns",
+            (venue, coin, since_ns),
+        ).fetchall()
     return conn.execute(
         "SELECT ts_ns, price, size_base, aggressor_side, taker_id, trade_id, taker_order_id "
-        "FROM trades WHERE venue=? AND coin=? AND is_liquidation=0 AND ts_ns>=? "
+        "FROM trades WHERE venue=? AND coin=? AND is_liquidation=0 AND ts_ns>=? AND ts_ns<? "
         "ORDER BY ts_ns",
-        (venue, coin, since_ns),
+        (venue, coin, since_ns, until_ns),
     ).fetchall()
 
 

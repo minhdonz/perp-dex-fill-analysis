@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import time
 
+from analysis import gap_rollup
 from collector.storage import connect
 
 WINDOW_NS = 2 * 3600 * 1_000_000_000
@@ -107,6 +108,10 @@ def main() -> None:
     now_ns = time.time_ns()
     n = summarize(conn, now_ns)
     print(f"summarized/updated {n} venue-coin-window rows")
+    # Precompute the per-window gap BEFORE thinning books (the gap can't be
+    # recomputed once books are thinned). Reads has_gap from window_summaries.
+    cells = gap_rollup.run(conn, verbose=False)
+    print(f"gap_rollup: {cells} new rung-cells")
     if not args.no_prune:
         thinned = thin_books(conn, now_ns)
         t, b = prune(conn, now_ns)
