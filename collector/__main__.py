@@ -10,8 +10,8 @@ import asyncio
 import logging
 
 from .storage import Store
-from .venues.binance_liq import BinanceLiqCollector
 from .venues.hyperliquid import HyperliquidCollector
+from .venues.okx_liq import OkxLiqCollector
 from .venues.lighter import LighterCollector
 from .venues.pacifica import PacificaCollector
 
@@ -36,8 +36,8 @@ async def status_loop(store: Store) -> None:
 async def amain(args: argparse.Namespace) -> None:
     store = Store(args.db)
     collectors = [VENUES[v](store, list(args.coins)) for v in args.venues]
-    if not args.no_binance_liq:
-        collectors.append(BinanceLiqCollector(store))
+    if not args.no_liq_feed:
+        collectors.append(OkxLiqCollector(store))
     tasks = [asyncio.create_task(store.run()), asyncio.create_task(status_loop(store))]
     for c in collectors:
         tasks.append(asyncio.create_task(c.run(), name=f"{c.name}-run"))
@@ -56,8 +56,8 @@ def main() -> None:
     p.add_argument("--db", default="data/fills.db")
     p.add_argument("--venues", nargs="+", choices=sorted(VENUES), default=sorted(VENUES))
     p.add_argument("--coins", nargs="+", default=DEFAULT_COINS)
-    p.add_argument("--no-binance-liq", action="store_true",
-                   help="disable the Binance market-wide liquidation feed (cascade signal)")
+    p.add_argument("--no-liq-feed", action="store_true",
+                   help="disable the OKX market-wide liquidation feed (cascade signal)")
     p.add_argument("-v", "--verbose", action="store_true")
     args = p.parse_args()
     logging.basicConfig(
