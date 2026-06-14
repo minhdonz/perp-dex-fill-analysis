@@ -79,6 +79,8 @@ analysis/
   history.py           time-series net cost: daily + 12 session windows (P1, the moat)
   fees.py / funding.py / netcost.py   fee + funding models + shared net-cost math
   gap_rollup.py        per-window gap precompute -> gap_windows (before book thinning)
+  stress.py            Behavior Under Stress — OKX-liquidation cascade detection +
+                       per-venue execution degradation vs baseline (PRD §6.3)
   clips.py             single-venue calibration + grouping audit + gap
   spike.py             original BTC spike (superseded by reconstruct/clips)
   rollup.py            2h summaries + gap_rollup + gap marking + 90d retention (§5, §6)
