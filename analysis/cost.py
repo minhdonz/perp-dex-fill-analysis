@@ -105,10 +105,18 @@ def main() -> None:
         for v in eligible:
             fb, basis = funding.funding_cost_bps(conn, v, coin, hold_hours, args.side)
             fund[v] = (fb, basis)
-        fstr = "  ".join(
-            f"{v}:{fund[v][1].split(' ')[0]}" for v in eligible if fund[v][0] is not None)
+        parts = []
+        for v in eligible:
+            if fund[v][0] is None:
+                continue
+            apr = fund[v][1].split(" ")[0]  # +8.0%APR
+            st = funding.get_stability(conn, v, coin)
+            flip = f" flip{st[1]*100:.0f}%" if st and st[1] is not None else ""
+            parts.append(f"{v}:{apr}{flip}")
+        fstr = "  ".join(parts)
         print("\n" + "═" * 90)
         print(f" {coin}    funding {args.side} {args.hold_days:g}d:  {fstr or '(no funding data — run fetch_funding.py)'}")
+        print("  (flip% = share of hours funding changed sign; high = unstable/unpredictable carry)")
         print("═" * 90)
         print(f"  {'rung':>5}  {'venue':<12} {'conf':>5} {'n':>4} "
               f"{'slip/leg':>8} {'fee/leg':>8} {'fund':>7} {'ENTRY':>6} {'ROUND-TRIP':>11}  fee basis")

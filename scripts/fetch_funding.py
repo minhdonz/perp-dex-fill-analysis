@@ -18,7 +18,7 @@ import urllib.parse
 import urllib.request
 
 sys.path.insert(0, ".")
-from analysis.funding import HOURS_PER_YEAR, ensure_schema
+from analysis.funding import HOURS_PER_YEAR, ensure_schema, stability
 from collector.storage import connect
 
 HL_INFO = "https://api.hyperliquid.xyz/info"
@@ -42,12 +42,14 @@ def _post(url, payload, timeout=15):
 
 def hl_hourly(coin, start_ms):
     d = _post(HL_INFO, {"type": "fundingHistory", "coin": coin, "startTime": start_ms})
+    d.sort(key=lambda x: x["time"])  # chronological for flip-rate
     return [float(x["fundingRate"]) for x in d]  # fraction/hr
 
 
-def pacifica_hourly(coin):
-    url = f"{PACIFICA_HIST}?{urllib.parse.urlencode({'symbol': coin})}"
+def pacifica_hourly(coin, limit):
+    url = f"{PACIFICA_HIST}?{urllib.parse.urlencode({'symbol': coin, 'limit': limit})}"
     d = _get(url).get("data") or []
+    d.sort(key=lambda x: int(x["created_at"]))  # endpoint returns newest-first
     return [float(x["funding_rate"]) for x in d]  # fraction/hr
 
 
@@ -61,9 +63,10 @@ def lighter_hourly(market_id, start_s, end_s, count_back):
         "market_id": market_id, "resolution": "1h",
         "start_timestamp": start_s, "end_timestamp": end_s, "count_back": count_back})
     d = _get(f"{LIGHTER_FUNDINGS}?{q}")
+    fundings = sorted(d.get("fundings", []), key=lambda f: f["timestamp"])
     # Lighter 'rate' is PERCENT/hr -> ÷100; 'direction' sets sign
     out = []
-    for f in d.get("fundings", []):
+    for f in fundings:
         rate = float(f["rate"]) / 100.0
         if f.get("direction") == "short":
             rate = -rate
@@ -75,15 +78,17 @@ def store(conn, venue, coin, rates, days):
     if not rates:
         print(f"  {venue}/{coin}: no samples")
         return
-    mean_hourly = sum(rates) / len(rates)
+    mean_hourly, pct_pos, flip_rate, std = stability(rates)
     apr = mean_hourly * HOURS_PER_YEAR
     with conn:
         conn.execute(
             "INSERT OR REPLACE INTO funding_rates "
-            "(venue, coin, mean_hourly, apr, n_samples, window_days, fetched_ns) "
-            "VALUES (?,?,?,?,?,?,?)",
-            (venue, coin, mean_hourly, apr, len(rates), days, time.time_ns()))
-    print(f"  {venue:<11} {coin:<5} mean_hourly={mean_hourly:+.3e}  APR={apr*100:+6.2f}%  n={len(rates)}")
+            "(venue, coin, mean_hourly, apr, pct_positive, flip_rate, std_hourly, "
+            " n_samples, window_days, fetched_ns) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (venue, coin, mean_hourly, apr, pct_pos, flip_rate, std,
+             len(rates), days, time.time_ns()))
+    print(f"  {venue:<11} {coin:<5} APR={apr*100:+6.2f}%  flip={flip_rate*100:3.0f}%  "
+          f"pos={pct_pos*100:3.0f}%  n={len(rates)}")
 
 
 def main() -> None:
@@ -107,7 +112,7 @@ def main() -> None:
                 if venue == "hyperliquid":
                     store(conn, venue, coin, hl_hourly(coin, start_ms), args.days)
                 elif venue == "pacifica":
-                    store(conn, venue, coin, pacifica_hourly(coin), args.days)
+                    store(conn, venue, coin, pacifica_hourly(coin, count_back), args.days)
                 elif venue == "lighter":
                     mid = lighter_ids.get(coin)
                     if mid is None:
