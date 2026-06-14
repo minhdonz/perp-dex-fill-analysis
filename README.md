@@ -101,11 +101,13 @@ deploy/                systemd unit + one-command VPS bootstrap
 
 **Fees (Phase 1 of "true cost", PRD §5.3) are real where the venue exposes them:**
 
-| Venue | Fee source | Assumption? |
+All schedules from official docs (confirmed 2026-06-14):
+
+| Venue | Fee structure | What we can do |
 |---|---|---|
-| Hyperliquid | **real per-account** via public `userFees` (cached), or the published tier ladder for a fund's stated `--volume` | none — the account's actual rate, or the fund's own volume |
-| Lighter | published schedule (no public fee API) | flagged `‡` unconfirmed until checked vs docs |
-| Pacifica | none encoded yet (no public fee API, no taker id) | shown as `—` |
+| Hyperliquid | 14d-volume ladder (4.5→2.4 bps taker) | **real per-account** via public `userFees` (cached), or the ladder at a fund's `--volume` |
+| Pacifica | 14d-volume ladder (4.0→2.8 bps taker) | ladder at a fund's `--volume`; no per-account read (no taker id), so base tier otherwise |
+| Lighter | **standard = 0%**, opt-in Premium = flat 2.8 bps taker (1.96 at max LIT stake), for lower latency | standard (0) shown; account type isn't on the feed |
 
 The headline this surfaces: **fees dominate and flip the ranking.** Hyperliquid
 is cheapest on raw slippage (~0.08 bps at the touch) but far pricier on *net*

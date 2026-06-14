@@ -61,18 +61,16 @@ def collect(conn, venue, coin, since_ns, window_ms):
 
 
 def venue_fee_bps(conn, venue, clip_keys, assumed_vol):
-    """(fee_bps, basis) for a rung. HL: median real per-account, or ladder if
-    --volume set. LT/PC: schedule."""
-    if venue == "hyperliquid":
-        if assumed_vol is not None:
-            return fees.hl_taker_bps_for_volume(assumed_vol), f"tier {fees.hl_tier_label(assumed_vol)}"
+    """(fee_bps, basis) for a rung. HL with no stated volume uses observed real
+    per-account rates (needs clip keys); everything else delegates to the fee
+    model (HL/Pacifica ladder at --volume, Lighter standard)."""
+    if venue == "hyperliquid" and assumed_vol is None:
         reals = [b for k in clip_keys
                  if (b := fees.real_hl_taker_bps(conn, k)) is not None]
         if reals:
             return median(reals), f"real n={len(reals)}"
         return fees.HL_TIERS[0][1] * 1e4, "base (uncached)"
-    bps, basis = fees.taker_bps(conn, venue)
-    return bps, basis
+    return fees.taker_bps(conn, venue, assumed_vol_14d=assumed_vol)
 
 
 def main() -> None:
@@ -93,12 +91,14 @@ def main() -> None:
 
     print("\nNET COST TO EXECUTE — slippage + taker fee (bps).  Funding = Phase 2, not included.")
     if args.volume is not None:
-        print(f"HL priced at the fund's stated volume: ${args.volume:,.0f}/14d "
-              f"-> tier {fees.hl_tier_label(args.volume)} "
-              f"({fees.hl_taker_bps_for_volume(args.volume):.2f}bps taker)")
+        print(f"HL/Pacifica priced at the fund's stated volume ${args.volume:,.0f}/14d -> "
+              f"HL {fees.tier_label('hyperliquid', args.volume)} "
+              f"({fees.taker_bps_for_volume('hyperliquid', args.volume):.2f}bps), "
+              f"Pacifica {fees.tier_label('pacifica', args.volume)} "
+              f"({fees.taker_bps_for_volume('pacifica', args.volume):.2f}bps)")
     else:
         print("HL priced at observed takers' REAL rates (median per rung). "
-              "Pass --volume to price your own tier.")
+              "Pass --volume to price your own tier (HL + Pacifica).")
     print("entry = slip/leg + fee/leg   ·   round-trip = 2×(slip+fee), taker both legs")
 
     for coin in args.assets:
@@ -145,13 +145,16 @@ def main() -> None:
                       f"{slip:>8.2f} {feec:>9} {entry:>7} {rt:>11}  {basis}")
                 label = ""
 
-    print("\n  fee basis: real=actual per-account (HL userFees) · tier=HL ladder for --volume")
-    print("             schedule‡=published but unconfirmed · —=no schedule encoded yet")
+    print("\n  fee basis (all schedules from official docs, 2026-06-14):")
+    print("    real     = HL actual per-account rate (public userFees)")
+    print("    tier >$X = HL/Pacifica 14d-volume ladder priced at --volume (the fund's own number)")
+    print("    base     = lowest tier (Pacifica has no per-account read; HL uncached)")
+    print("    standard = Lighter standard account (0 fee, higher latency)")
     print("  * = sparse (n below threshold)   ·   funding not included (Phase 2)")
-    for v in ("lighter", "pacifica"):
-        s = fees.SCHEDULES.get(v)
-        if s and not s.confirmed:
-            print(f"  note [{v}]: {s.note}")
+    print("  note [lighter]: standard=0 shown; opt-in Premium pays flat 2.8bps taker")
+    print("                  (1.96 at max LIT stake), in exchange for lower latency")
+    print("  note [pacifica]: no taker id on feed -> can't read real accounts; --volume")
+    print("                   prices the fund's tier, else base tier (4.0bps) is shown")
 
 
 if __name__ == "__main__":
