@@ -130,6 +130,24 @@ CREATE TABLE IF NOT EXISTS funding_windows (
     n_hours INTEGER NOT NULL,
     PRIMARY KEY (venue, coin, window_start_ns)
 );
+
+-- External market-wide liquidations (Binance !forceOrder@arr), the cross-market
+-- cascade signal for Behavior Under Stress (PRD §6.3). Binance throttles to
+-- ~1/sec/symbol, so this captures cascade *timing/intensity*, not full count.
+CREATE TABLE IF NOT EXISTS ext_liquidations (
+    id INTEGER PRIMARY KEY,
+    source TEXT NOT NULL,        -- 'binance'
+    coin TEXT NOT NULL,          -- parsed from symbol (BTCUSDT -> BTC)
+    symbol TEXT NOT NULL,
+    ts_ns INTEGER NOT NULL,
+    side TEXT NOT NULL,          -- 'long_liq' (forced sell) | 'short_liq' (forced buy)
+    size REAL,
+    price REAL,
+    notional_usd REAL NOT NULL,
+    date TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_extliq_ts ON ext_liquidations (source, ts_ns);
+CREATE INDEX IF NOT EXISTS idx_extliq_coin ON ext_liquidations (source, coin, ts_ns);
 """
 
 # explicit column list so to_row() order is the single source of truth
@@ -145,6 +163,9 @@ INSERT_STATS = """INSERT INTO market_stats
     VALUES (?,?,?,?,?,?,?,?)"""
 INSERT_INTEGRITY = """INSERT INTO integrity_log (ts_ns, venue, coin, feed, event, detail)
     VALUES (?,?,?,?,?,?)"""
+INSERT_EXTLIQ = """INSERT INTO ext_liquidations
+    (source, coin, symbol, ts_ns, side, size, price, notional_usd, date)
+    VALUES (?,?,?,?,?,?,?,?,?)"""
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
@@ -178,10 +199,13 @@ class Store:
         self.flush_interval = flush_interval
         self.queue: asyncio.Queue[tuple[str, tuple]] = asyncio.Queue()
         self._task: asyncio.Task | None = None
-        self.counts = {"trade": 0, "book": 0, "stats": 0, "integrity": 0}
+        self.counts = {"trade": 0, "book": 0, "stats": 0, "integrity": 0, "ext_liq": 0}
 
     def put_trade(self, rec: TradeRecord) -> None:
         self.queue.put_nowait(("trade", rec.to_row()))
+
+    def put_ext_liq(self, row: tuple) -> None:
+        self.queue.put_nowait(("ext_liq", row))
 
     def put_book(self, rec: BookSnapshot) -> None:
         self.queue.put_nowait(("book", rec.to_row()))
@@ -206,7 +230,8 @@ class Store:
             raise
 
     def flush(self) -> None:
-        batches: dict[str, list[tuple]] = {"trade": [], "book": [], "stats": [], "integrity": []}
+        batches: dict[str, list[tuple]] = {"trade": [], "book": [], "stats": [],
+                                           "integrity": [], "ext_liq": []}
         while not self.queue.empty():
             kind, row = self.queue.get_nowait()
             batches[kind].append(row)
@@ -221,6 +246,8 @@ class Store:
                 self.conn.executemany(INSERT_STATS, batches["stats"])
             if batches["integrity"]:
                 self.conn.executemany(INSERT_INTEGRITY, batches["integrity"])
+            if batches["ext_liq"]:
+                self.conn.executemany(INSERT_EXTLIQ, batches["ext_liq"])
         for k, rows in batches.items():
             self.counts[k] += len(rows)
 

@@ -13,7 +13,7 @@ from .storage import Store
 log = logging.getLogger("collector")
 
 # A feed silent longer than this during a live connection is flagged stale.
-STALE_AFTER_S = {"trades": 600.0, "book": 120.0, "stats": 300.0}
+STALE_AFTER_S = {"trades": 600.0, "book": 120.0, "stats": 300.0, "liq": 1800.0}
 LIVENESS_CHECK_INTERVAL_S = 30.0
 
 
