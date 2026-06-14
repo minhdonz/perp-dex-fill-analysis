@@ -22,6 +22,7 @@ from collections import defaultdict
 
 from analysis import fees
 from analysis.netcost import net_cost
+from analysis.reconstruct import BOOK_RELIABLE
 
 WINDOW_NS = 2 * 3600 * 1_000_000_000
 DAY_NS = 24 * 3600 * 1_000_000_000
@@ -104,8 +105,10 @@ def print_slice(title, conn, venues, coin, rung, since_ns, key_fn, label_fn,
             fund_bps = side_sign * mh * hold_hours * 1e4 if mh is not None else 0.0
             _, rt = net_cost(cell["realized"], fee, fund_bps)
             sp = "*" if cell["n"] < min_clips else " "
+            # Pacifica's gap is feed-limited (book refreshes faster than snapshots)
+            gap_s = f"{cell['gap']:>+6.2f}" if BOOK_RELIABLE.get(v, True) else "   ~fl"
             print(f"  {label_fn(k):>14}  {v:<12} {cell['n']:>4}{sp} "
-                  f"{cell['realized']:>6.2f} {cell['gap']:>+6.2f} {fee:>6.2f} "
+                  f"{cell['realized']:>6.2f} {gap_s} {fee:>6.2f} "
                   f"{apr:>+7.1f}% {rt:>+8.2f}")
 
 
@@ -142,8 +145,9 @@ def main() -> None:
                     conn, args.venues, coin, args.rung, since_ns,
                     sess_key, session_label, args.volume, hold_hours, args.side, args.min_clips)
     print("\n  slip=realized slippage/leg · gap=realized−advertised · fee=taker (tier) · "
-          "* = sparse (n<min)\n  funding from funding_windows (trailing per-window); "
-          "gap-marked windows excluded")
+          "* = sparse (n<min)\n  ~fl = Pacifica gap feed-limited (book refreshes faster than "
+          "snapshots); realized/net are reliable\n  funding from funding_windows (trailing "
+          "per-window); gap-marked windows excluded")
 
 
 if __name__ == "__main__":

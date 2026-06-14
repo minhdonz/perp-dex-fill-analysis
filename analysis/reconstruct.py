@@ -28,6 +28,14 @@ TOLERANCE_NS = 1_000_000_000  # §3 matching tolerance: 1s
 METHOD = {"lighter": "exact", "hyperliquid": "identity", "pacifica": "heuristic"}
 DEFAULT_WINDOW_MS = {"hyperliquid": 150, "pacifica": 150}  # ignored for exact
 
+# Is the venue's public book snapshot a faithful basis for the *advertised* leg?
+# Pacifica's off-chain sub-10ms engine refreshes the touch far faster than its
+# ~4/s book feed (verified 2026-06-14: large clips fill 2-4x the displayed touch
+# even against <150ms-fresh snapshots, and it has no hidden/iceberg order types).
+# So its advertised-vs-realized GAP is structurally under-measured from snapshots
+# and is flagged feed-limited; its REALIZED cost is still trustworthy.
+BOOK_RELIABLE = {"hyperliquid": True, "lighter": True, "pacifica": False}
+
 RUNGS = [10_000, 25_000, 100_000, 500_000, 1_000_000, 5_000_000]
 
 
