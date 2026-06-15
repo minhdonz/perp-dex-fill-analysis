@@ -81,6 +81,7 @@ analysis/
   gap_rollup.py        per-window gap precompute -> gap_windows (before book thinning)
   stress.py            Behavior Under Stress — OKX-liquidation cascade detection +
                        per-venue execution degradation vs baseline (PRD §6.3)
+  edition.py           assembles all sections into one markdown report (PRD §6, P0)
   clips.py             single-venue calibration + grouping audit + gap
   spike.py             original BTC spike (superseded by reconstruct/clips)
   rollup.py            2h summaries + gap_rollup + gap marking + 90d retention (§5, §6)
@@ -106,6 +107,12 @@ deploy/                systemd unit + one-command VPS bootstrap
 
 # Net cost OVER TIME — daily trend + 12 Asia/EU/US session windows (the moat, P1)
 .venv/bin/python -m analysis.history --db data/fills.db --assets BTC --rung 100000 --volume 200e6 --hold-days 7
+
+# Behavior Under Stress — liquidation-cascade detection + per-venue degradation
+.venv/bin/python -m analysis.stress --db data/fills.db --threshold 5e6 --days 7
+
+# Assemble the full monthly edition (markdown) — The Gap + True Cost + Stress + Methodology
+.venv/bin/python -m analysis.edition --db data/fills.db --hours 24 --volume 200e6 --hold-days 7 --out edition.md
 ```
 
 **The time dimension (PRD P1 / G3 — "history is the product").** `gap_rollup.py`
