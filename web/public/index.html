@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RealizedFill — perp DEX execution quality</title>
+<meta name="description" content="Advertised vs realized execution cost across perp DEXs, tracked over time. Read-only, no capital.">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<header class="nav">
+  <div class="brand">RealizedFill</div>
+  <nav>
+    <a href="#gap">The Gap</a>
+    <a href="#cost">Cost</a>
+    <a href="#track">Track Record</a>
+    <a href="#stress">Stress</a>
+    <a href="#method">Method</a>
+  </nav>
+  <div class="updated" id="updated"></div>
+</header>
+
+<section id="hero">
+  <h1 id="headline">Loading…</h1>
+  <p class="tagline">Depth is what the book shows. Execution quality is what you actually get. This measures the second.</p>
+  <p class="trust">Read-only measurement of public trade &amp; book feeds — no capital, no orders, no wallets.</p>
+</section>
+
+<main>
+  <section id="gap" class="block">
+    <h2>The Gap — advertised vs realized</h2>
+    <p class="sub">What a clip of each size actually cost (bps), vs what the order book advertised. <strong>Cheapest venue bold.</strong> <span class="badge">fl</span> = Pacifica book feed-limited (realized shown, not gap).</p>
+    <div class="tabs" id="gap-tabs"></div>
+    <div class="table-wrap"><table id="gap-table"></table></div>
+    <div class="chart-box"><canvas id="gap-chart"></canvas></div>
+  </section>
+
+  <section id="cost" class="block">
+    <h2>Cost to run a position</h2>
+    <p class="sub">Your all-in cost — slippage + taker fee (both legs) + funding over the hold. Computed live in your browser from your inputs.</p>
+    <div class="calc">
+      <div class="controls">
+        <label>Asset <select id="c-asset"></select></label>
+        <label>Clip size <select id="c-size"></select></label>
+        <label>Your 14-day volume <span class="val" id="c-vol-val"></span>
+          <input type="range" id="c-vol" min="0" max="9" step="1" value="5"></label>
+        <label>Hold <span class="val" id="c-hold-val"></span>
+          <input type="range" id="c-hold" min="0" max="30" step="0.5" value="7"></label>
+        <label>Side
+          <span class="toggle"><button data-side="long" class="on">Long</button><button data-side="short">Short</button></span>
+        </label>
+      </div>
+      <div class="results" id="c-results"></div>
+      <p class="note" id="c-note"></p>
+    </div>
+  </section>
+
+  <section id="track" class="block">
+    <h2>Track record</h2>
+    <p class="sub">How the gap and cost evolve over time — the part a live snapshot can't show. History compounds.</p>
+    <div class="controls">
+      <label>Asset <select id="t-asset"></select></label>
+      <label>Clip size <select id="t-rung"></select></label>
+      <label>Metric <select id="t-metric"><option value="gap">Gap</option><option value="realized">Realized cost</option></select></label>
+    </div>
+    <div class="chart-box"><canvas id="track-chart"></canvas></div>
+    <h3>By time of day (Asia / EU / US, 2-hour windows)</h3>
+    <div id="heatmap" class="heatmap"></div>
+  </section>
+
+  <section id="stress" class="block">
+    <h2>Behavior under stress</h2>
+    <p class="sub">When the market gets liquidated, does fill quality hold? Cascades from the market-wide liquidation feed; execution during vs the prior-24h baseline.</p>
+    <div id="stress-body"></div>
+  </section>
+
+  <section id="method" class="block">
+    <h2>Methodology &amp; confidence</h2>
+    <p class="sub">What's measured, how, and where the seams are. Coverage = share of clean 2-hour windows (windows with a detected feed gap are excluded, never averaged in).</p>
+    <div class="table-wrap"><table id="cov-table"></table></div>
+    <ul id="seams"></ul>
+  </section>
+</main>
+
+<footer>
+  <p>RealizedFill · read-only perp DEX execution-quality measurement · data refreshes periodically.</p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
