@@ -1,7 +1,7 @@
 """Edition assembler — turns the analyses into one markdown report (PRD §6, P0).
 
-Sections: 1. The Gap · 2. True Cost to Hold · 3. Behavior Under Stress ·
-4. Methodology & Confidence (coverage, confidence tags, the honest seams) ·
+Sections: In plain English (auto-generated lay summary) · 1. The Gap ·
+2. True Cost to Hold · 3. Behavior Under Stress · 4. Methodology & Confidence ·
 5. One opinionated call (left for the author).
 
 Reuses the analysis library so the numbers match the live tools exactly.
@@ -17,7 +17,7 @@ from statistics import median
 
 from analysis import cost, fees, funding, league, stress
 from analysis.netcost import net_cost
-from analysis.reconstruct import BOOK_RELIABLE, METHOD, RUNGS, touch_floor_bps
+from analysis.reconstruct import METHOD, RUNGS, touch_floor_bps
 
 VENUES = ["hyperliquid", "lighter", "pacifica"]
 CONF_LABEL = {"exact": "exact (order id)", "identity": "identity (taker+window)",
@@ -28,14 +28,27 @@ def rung_label(r):
     return f"${r//1000}k" if r < 1_000_000 else f"${r//1_000_000}M"
 
 
-def section_gap(conn, assets, since_ns, window_ms, min_samples):
-    out = ["## 1. The Gap — advertised vs realized execution cost\n",
-           "_Realized cost per clip-size rung (bps), cheapest venue in **bold**. "
-           "`fl` = Pacifica's book is feed-limited (refreshes faster than snapshots), "
-           "so its gap isn't comparable; its realized cost is._\n"]
+def usd(bps, notional):
+    return bps / 1e4 * notional
+
+
+def cheapest(cells):
+    rk = [c for c in cells.values() if c and c["rankable"]]
+    return min(rk, key=lambda c: c["real"]) if rk else None
+
+
+def priciest(cells):
+    rk = [c for c in cells.values() if c and c["rankable"]]
+    return max(rk, key=lambda c: c["real"]) if rk else None
+
+
+# ---- computation (shared by the table and the plain-English read) ----
+
+def compute_gap(conn, assets, since_ns, window_ms, min_samples):
+    """{asset: {rung: {venue: cell|None}}} for assets with any data."""
+    gap = {}
     for coin in assets:
-        floors, data = {}, {}
-        present = False
+        floors, data, present = {}, {}, False
         for v in VENUES:
             per_rung, cov = league.collect(conn, v, coin, since_ns, window_ms)
             data[v] = per_rung
@@ -43,43 +56,21 @@ def section_gap(conn, assets, since_ns, window_ms, min_samples):
             present = present or cov["prints"] > 0
         if not present:
             continue
-        out.append(f"\n**{coin}**\n")
-        out.append("| rung | " + " | ".join(VENUES) + " |")
-        out.append("|" + "---|" * (len(VENUES) + 1))
+        gap[coin] = {}
         for rung in RUNGS:
-            cells = {}
-            for v in VENUES:
-                ms = data[v].get(rung)
-                cells[v] = league.build_cell(v, ms, floors[v], min_samples) if ms else None
-            if not any(cells.values()):
-                continue
-            rankable = [c for c in cells.values() if c and c["rankable"]]
-            best = min(rankable, key=lambda c: c["real"])["venue"] if rankable else None
-            row = [rung_label(rung)]
-            for v in VENUES:
-                c = cells[v]
-                if not c:
-                    row.append("–")
-                    continue
-                gap = "fl" if c["feed_limited"] else f"{c['gap']:+.2f}"
-                txt = f"{c['real']:.2f} ({gap}){'*' if c['sparse'] else ''}"
-                row.append(f"**{txt}**" if v == best else txt)
-            out.append("| " + " | ".join(row) + " |")
-    out.append("\n_`*` = sparse (few samples); a venue absent for an asset isn't listed._\n")
-    return "\n".join(out)
+            cells = {v: (league.build_cell(v, data[v][rung], floors[v], min_samples)
+                         if data[v].get(rung) else None) for v in VENUES}
+            if any(cells.values()):
+                gap[coin][rung] = cells
+    return gap
 
 
-def section_cost(conn, assets, since_ns, window_ms, rung, volume, hold_days, side):
+def compute_cost(conn, assets, since_ns, window_ms, rung, volume, hold_days, side):
     hold_h = hold_days * 24
-    out = [f"\n## 2. True Cost to Hold — net cost at {rung_label(rung)}, "
-           f"${volume/1e6:.0f}M/14d fund, {side} {hold_days:g}d hold\n",
-           "_Net = slippage + taker fee (both legs) + funding over the hold (bps)._\n",
-           "| asset | venue | slip/leg | fee/leg | funding | round-trip |",
-           "|---|---|---|---|---|---|"]
+    rows = []
     for coin in assets:
         for v in VENUES:
-            per_rung = cost.collect(conn, v, coin, since_ns, window_ms)
-            ms = per_rung.get(rung)
+            ms = cost.collect(conn, v, coin, since_ns, window_ms).get(rung)
             if not ms:
                 continue
             slip = median(s for s, _ in ms)
@@ -87,7 +78,116 @@ def section_cost(conn, assets, since_ns, window_ms, rung, volume, hold_days, sid
             fb, _ = funding.funding_cost_bps(conn, v, coin, hold_h, side)
             fb = fb or 0.0
             _, rt = net_cost(slip, fee, fb)
-            out.append(f"| {coin} | {v} | {slip:.2f} | {fee:.2f} | {fb:+.2f} | {rt:+.2f} |")
+            rows.append({"asset": coin, "venue": v, "slip": slip, "fee": fee,
+                         "funding": fb, "rt": rt})
+    return rows
+
+
+# ---- rendering ----
+
+def section_plain_english(gap, cost_rows, rung, hold_days):
+    rl = rung_label(rung)
+    L = ["## In plain English\n",
+         f"_\"bps\" = basis points = 0.01%. On a {rl} trade, 1 bp ≈ ${rung/1e4:,.0f}. "
+         "\"The gap\" is how much worse a trade actually filled than the order book "
+         "promised; lower realized cost is better._\n"]
+
+    # 1. cheapest to trade the focal size on a major
+    for coin in ("BTC", "ETH", "SOL"):
+        cells = gap.get(coin, {}).get(rung)
+        if not cells:
+            continue
+        ch, pr = cheapest(cells), priciest(cells)
+        if not ch:
+            break
+        s = (f"- **Trading {rl} of {coin}** was cheapest on **{ch['venue']}** at about "
+             f"{ch['real']:.2f} bps (~${usd(ch['real'], rung):,.0f} on a {rl} clip)")
+        if pr and pr["venue"] != ch["venue"] and pr["real"] > ch["real"] + 0.02:
+            s += (f", versus {pr['real']:.2f} bps (~${usd(pr['real'], rung):,.0f}) "
+                  f"on {pr['venue']}")
+            if ch["real"] > 0 and pr["real"] / ch["real"] >= 1.5:
+                s += f" — roughly {pr['real']/ch['real']:.0f}× more"
+        L.append(s + ".")
+        break
+
+    # 2. widest divergence across assets at the focal rung
+    best = None
+    for coin, rungs in gap.items():
+        cells = rungs.get(rung)
+        if not cells:
+            continue
+        ch, pr = cheapest(cells), priciest(cells)
+        if ch and pr and ch["venue"] != pr["venue"] and ch["real"] > 0:
+            mult = pr["real"] / ch["real"]
+            if best is None or mult > best[0]:
+                best = (mult, coin, ch, pr)
+    if best and best[0] >= 2:
+        mult, coin, ch, pr = best
+        L.append(f"- The widest spread between venues was on **{coin}**: {ch['venue']} "
+                 f"filled {rl} at ~{ch['real']:.2f} bps while {pr['venue']} charged "
+                 f"~{pr['real']:.2f} bps — **about {mult:.0f}× more expensive** for the "
+                 "same trade.")
+
+    # 3. cheapest to enter vs to hold (net cost) on BTC
+    btc = [r for r in cost_rows if r["asset"] == "BTC"]
+    if btc:
+        rt = min(btc, key=lambda r: r["rt"])
+        slip_best = min(btc, key=lambda r: r["slip"])
+        s = (f"- **Cheapest to actually *hold*** a {rl} BTC position for {hold_days:g} days "
+             f"(spread + fees + funding) was **{rt['venue']}** at ~{rt['rt']:+.0f} bps "
+             f"round-trip (~${usd(abs(rt['rt']), rung):,.0f})")
+        if slip_best["venue"] != rt["venue"]:
+            s += (f". Note {slip_best['venue']} had the tightest *spread*, but fees and "
+                  "funding change who's cheapest once you hold")
+        L.append(s + ". Fees and funding dwarf the spread for any real hold.")
+
+    # 4. negative funding = paid to hold
+    paid = sorted({r["asset"] for r in cost_rows if r["funding"] < -1})
+    if paid:
+        L.append(f"- On **{', '.join(paid)}**, funding currently *pays* people who are long "
+                 "— so holding the position can earn money over the period rather than cost it.")
+    L.append("")
+    return "\n".join(L)
+
+
+def section_gap(gap):
+    out = ["## 1. The Gap — advertised vs realized execution cost\n",
+           "_Realized cost per clip-size rung (bps), cheapest venue in **bold**. "
+           "`fl` = Pacifica's book is feed-limited (refreshes faster than snapshots), "
+           "so its gap isn't comparable; its realized cost is._\n"]
+    for coin, rungs in gap.items():
+        out.append(f"\n**{coin}**\n")
+        out.append("| rung | " + " | ".join(VENUES) + " |")
+        out.append("|" + "---|" * (len(VENUES) + 1))
+        for rung in RUNGS:
+            cells = rungs.get(rung)
+            if not cells:
+                continue
+            rk = [c for c in cells.values() if c and c["rankable"]]
+            best = min(rk, key=lambda c: c["real"])["venue"] if rk else None
+            row = [rung_label(rung)]
+            for v in VENUES:
+                c = cells[v]
+                if not c:
+                    row.append("–")
+                    continue
+                g = "fl" if c["feed_limited"] else f"{c['gap']:+.2f}"
+                txt = f"{c['real']:.2f} ({g}){'*' if c['sparse'] else ''}"
+                row.append(f"**{txt}**" if v == best else txt)
+            out.append("| " + " | ".join(row) + " |")
+    out.append("\n_`*` = sparse (few samples); a venue absent for an asset isn't listed._\n")
+    return "\n".join(out)
+
+
+def section_cost(cost_rows, rung, volume, hold_days, side):
+    out = [f"\n## 2. True Cost to Hold — net cost at {rung_label(rung)}, "
+           f"${volume/1e6:.0f}M/14d fund, {side} {hold_days:g}d hold\n",
+           "_Net = slippage + taker fee (both legs) + funding over the hold (bps)._\n",
+           "| asset | venue | slip/leg | fee/leg | funding | round-trip |",
+           "|---|---|---|---|---|---|"]
+    for r in cost_rows:
+        out.append(f"| {r['asset']} | {r['venue']} | {r['slip']:.2f} | {r['fee']:.2f} | "
+                   f"{r['funding']:+.2f} | {r['rt']:+.2f} |")
     return "\n".join(out)
 
 
@@ -122,23 +222,17 @@ def section_stress(conn, assets, since_ns, threshold, bucket_min, merge_gap_min,
     return "\n".join(out)
 
 
-def section_methodology(conn, assets, since_ns, window_ms):
-    out = ["\n## 4. Methodology & Confidence\n"]
-    # coverage from window_summaries
-    out.append("**Coverage (clean 2h windows, excluded if a feed gap was detected):**\n")
-    out.append("| venue | method | clean windows |")
-    out.append("|---|---|---|")
+def section_methodology(conn):
+    out = ["\n## 4. Methodology & Confidence\n",
+           "**Coverage (clean 2h windows, excluded if a feed gap was detected):**\n",
+           "| venue | method | clean windows |", "|---|---|---|"]
     for v in VENUES:
-        row = conn.execute(
+        total, gapped = conn.execute(
             "SELECT COUNT(*), COALESCE(SUM(has_gap),0) FROM window_summaries WHERE venue=?",
             (v,)).fetchone()
-        total, gapped = row[0], row[1]
         pct = f"{100*(total-gapped)/total:.1f}% of {total}" if total else "—"
         out.append(f"| {v} | {CONF_LABEL[METHOD[v]]} | {pct} |")
-    out.append("\n**Clip-size attribution confidence:** Lighter `exact` (per-order id), "
-               "Hyperliquid `identity` (taker address + time window), Pacifica `heuristic` "
-               "(print sweep, no taker id).\n")
-    out.append("**Honest seams:**")
+    out.append("\n**Honest seams:**")
     out.append("- **Pacifica advertised/gap is feed-limited** — its sub-10ms book refreshes "
                "faster than its ~4/s snapshot feed, so the book-implied cost under-measures "
                "real fillable liquidity. We report Pacifica's *realized* cost, not its gap.")
@@ -165,7 +259,7 @@ def main() -> None:
     ap.add_argument("--hold-days", type=float, default=7.0)
     ap.add_argument("--side", choices=["long", "short"], default="long")
     ap.add_argument("--stress-threshold", type=float, default=5e6)
-    ap.add_argument("--out", default=None, help="write to this path (default: stdout)")
+    ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
     conn = sqlite3.connect(args.db)
@@ -174,17 +268,21 @@ def main() -> None:
     since_ns = int((time.time() - args.hours * 3600) * 1e9)
     today = time.strftime("%Y-%m-%d", time.gmtime())
 
+    gap = compute_gap(conn, args.assets, since_ns, args.window_ms, args.min_samples)
+    cost_rows = compute_cost(conn, args.assets, since_ns, args.window_ms, args.rung,
+                             args.volume, args.hold_days, args.side)
+
     parts = [
         f"# RealizedFill — Edition {today}\n",
         f"_Advertised-vs-realized execution quality across perp DEXs. "
         f"Window: last {args.hours:g}h · Venues: {', '.join(VENUES)} · "
         f"Assets: {', '.join(args.assets)}._\n",
         "> Read-only measurement of public trade/book feeds; no capital, no orders.\n",
-        section_gap(conn, args.assets, since_ns, args.window_ms, args.min_samples),
-        section_cost(conn, args.assets, since_ns, args.window_ms, args.rung,
-                     args.volume, args.hold_days, args.side),
+        section_plain_english(gap, cost_rows, args.rung, args.hold_days),
+        section_gap(gap),
+        section_cost(cost_rows, args.rung, args.volume, args.hold_days, args.side),
         section_stress(conn, args.assets, since_ns, args.stress_threshold, 1.0, 10.0, 24.0),
-        section_methodology(conn, args.assets, since_ns, args.window_ms),
+        section_methodology(conn),
         "\n## 5. One opinionated call\n\n_[Author's stake-in-the-ground for this edition.]_\n",
     ]
     report = "\n".join(parts)
