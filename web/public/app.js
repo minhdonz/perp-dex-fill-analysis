@@ -4,7 +4,34 @@ const VENUES = ["hyperliquid", "lighter", "pacifica"];
 const VLABEL = { hyperliquid: "Hyperliquid", lighter: "Lighter", pacifica: "Pacifica" };
 const VCOLOR = { hyperliquid: "#5fb3b3", lighter: "#9b8cf0", pacifica: "#d6a85c" };
 const AXIS = "#6b6f78", GRID = "#1c1e22", LEGEND_FG = "#9296a0";
-if (window.Chart) { Chart.defaults.font.family = "JetBrains Mono, ui-monospace, monospace"; Chart.defaults.font.size = 11; Chart.defaults.color = AXIS; }
+if (window.Chart) {
+  Chart.defaults.font.family = "JetBrains Mono, ui-monospace, monospace";
+  Chart.defaults.font.size = 11;
+  Chart.defaults.color = AXIS;
+  // hover anywhere along the x-axis surfaces every series, no need to land on a point
+  Chart.defaults.interaction = { mode: "index", intersect: false, axis: "x" };
+  Chart.defaults.hover = { mode: "index", intersect: false };
+  Object.assign(Chart.defaults.plugins.tooltip, {
+    backgroundColor: "#15171a", borderColor: "#2b2e33", borderWidth: 1,
+    titleColor: "#e7e9ec", bodyColor: "#cdd0d5", titleFont: { weight: "500" },
+    padding: 10, cornerRadius: 8, usePointStyle: true, boxPadding: 6,
+    callbacks: { label: (c) => ` ${c.dataset.label}  ${c.parsed.y != null ? c.parsed.y.toFixed(2) + " bps" : "n/a"}` },
+  });
+  // vertical crosshair guide, drawn only for line charts
+  Chart.register({
+    id: "crosshair",
+    afterDatasetsDraw(chart) {
+      if (chart.config.type !== "line") return;
+      const act = chart.tooltip?.getActiveElements?.() || [];
+      if (!act.length) return;
+      const x = act[0].element.x, { top, bottom } = chart.chartArea, ctx = chart.ctx;
+      ctx.save();
+      ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom);
+      ctx.lineWidth = 1; ctx.strokeStyle = "rgba(203,178,133,.35)"; ctx.stroke();
+      ctx.restore();
+    },
+  });
+}
 const VOL_STOPS = [0, 5e6, 25e6, 50e6, 100e6, 250e6, 500e6, 1e9, 2e9, 7e9];
 const D = {};  // loaded JSON
 
