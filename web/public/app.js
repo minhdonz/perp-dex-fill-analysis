@@ -36,7 +36,7 @@ function renderGapTabs() {
 }
 function cheapestVenue(cells) {
   let best = null;
-  for (const v of VENUES) { const c = cells[v]; if (c && !c.sparse && (best === null || c.realized < best[1])) best = [v, c.realized]; }
+  for (const v of VENUES) { const c = cells[v]; if (c && !c.sparse && !c.bad_realized && (best === null || c.realized < best[1])) best = [v, c.realized]; }
   return best ? best[0] : null;
 }
 function renderGapTable() {
@@ -51,6 +51,7 @@ function renderGapTable() {
     for (const v of VENUES) {
       const c = cells[v];
       if (!c) { tr.appendChild(el("td", "muted", "–")); continue; }
+      if (c.bad_realized) { const td = el("td", "muted", "n/a"); td.title = "thin/stale cell — realized non-physical, suppressed"; tr.appendChild(td); continue; }
       const g = c.feed_limited ? `<span class="badge">fl</span>` : `${c.gap >= 0 ? "+" : ""}${c.gap.toFixed(2)}`;
       const star = c.sparse ? "<sup>*</sup>" : "";
       const td = el("td", v === best ? "best" : "", `${c.realized.toFixed(2)} <span class="g">(${g})</span>${star}`);
@@ -67,7 +68,7 @@ function renderGapChart() {
     datasets: VENUES.map((v) => ({
       label: VLABEL[v], backgroundColor: VCOLOR[v],
       data: D.calc.rungs.filter((r) => rungs[String(r)]).map((r) => {
-        const c = rungs[String(r)][v]; return c ? c.realized : null;
+        const c = rungs[String(r)][v]; return c && !c.bad_realized ? c.realized : null;
       }),
     })),
   };
@@ -194,9 +195,11 @@ function renderStress() {
 // ---------- Methodology ----------
 function renderMethod() {
   const t = $("#cov-table"); t.innerHTML = "";
-  t.appendChild(el("tr", "", "<th>venue</th><th>method</th><th>clean windows</th>"));
+  t.appendChild(el("tr", "", "<th>venue</th><th>clip-size method</th><th>data reliability (clean 2h windows)</th>"));
   D.coverage.venues.forEach((c) => {
-    t.appendChild(el("tr", "", `<td>${VLABEL[c.venue]}</td><td>${c.method}</td><td>${c.clean_pct == null ? "n/a" : c.clean_pct + "% of " + c.windows}</td>`));
+    const cell = c.clean_pct == null ? "n/a"
+      : `${c.clean_pct}% clean (${Math.round(c.clean_pct / 100 * c.windows)} of ${c.windows})`;
+    t.appendChild(el("tr", "", `<td>${VLABEL[c.venue]}</td><td>${c.method}</td><td>${cell}</td>`));
   });
   const ul = $("#seams"); ul.innerHTML = "";
   D.coverage.seams.forEach((s) => ul.appendChild(el("li", "", s)));

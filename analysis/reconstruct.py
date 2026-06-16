@@ -36,6 +36,12 @@ DEFAULT_WINDOW_MS = {"hyperliquid": 150, "pacifica": 150}  # ignored for exact
 # and is flagged feed-limited; its REALIZED cost is still trustworthy.
 BOOK_RELIABLE = {"hyperliquid": True, "lighter": True, "pacifica": False}
 
+# Realized cost below this (bps) is non-physical — a taker can't fill better than
+# the mid that existed before it, beyond small book-age drift. A clearly-negative
+# realized means the matched book's mid was stale/wrong (thin, illiquid cell), so
+# the number is suppressed everywhere rather than shown as a finding or ranked.
+NEG_REALIZED_LIMIT = -0.10
+
 RUNGS = [10_000, 25_000, 100_000, 500_000, 1_000_000, 5_000_000]
 
 

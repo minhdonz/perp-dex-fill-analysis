@@ -29,8 +29,8 @@ import time
 from statistics import median
 
 from analysis.reconstruct import (
-    BOOK_RELIABLE, METHOD, RUNGS, BookMatcher, group_clips, load_trades, measure,
-    rung_for, touch_floor_bps,
+    BOOK_RELIABLE, METHOD, NEG_REALIZED_LIMIT, RUNGS, BookMatcher, group_clips,
+    load_trades, measure, rung_for, touch_floor_bps,
 )
 
 ALL_VENUES = ["hyperliquid", "lighter", "pacifica"]
@@ -79,6 +79,9 @@ def build_cell(venue, ms, floor, min_samples):
     # under-measured by design — flag it, but realized is still trustworthy so
     # the cell stays rankable on realized.
     feed_limited = not BOOK_RELIABLE.get(venue, True)
+    # Non-physical negative realized = stale/wrong matched mid on a thin cell.
+    # Applies to every venue (incl. feed-limited Pacifica) — suppressed, not ranked.
+    bad_realized = real < NEG_REALIZED_LIMIT
     suspect = (not feed_limited) and (
         (touch_real and not touch_adv) or gap < -EGREGIOUS_NEG or real < -0.10)
     return {
@@ -86,8 +89,8 @@ def build_cell(venue, ms, floor, min_samples):
         "real": real, "adv": adv, "gap": gap,
         "age": median(x["book_age_ms"] for x in ms),
         "at_touch": touch_adv, "feed_limited": feed_limited,
-        "sparse": sparse, "suspect": suspect,
-        "rankable": not sparse and not suspect,
+        "sparse": sparse, "suspect": suspect, "bad_realized": bad_realized,
+        "rankable": not sparse and not suspect and not bad_realized,
     }
 
 
@@ -160,16 +163,22 @@ def main() -> None:
                     notes.append("at touch")
                 if c["suspect"]:
                     notes.append("beats book?")
-                if c["feed_limited"]:
+                if c["feed_limited"] and not c["bad_realized"]:
                     notes.append("gap feed-limited")
+                if c["bad_realized"]:
+                    notes.append("thin/stale (realized non-physical)")
                 if c["sparse"]:
                     notes.append("sparse")
                 note = ("· " + ", ".join(notes)) if notes else ""
-                # feed-limited venues: realized is real, adv/gap aren't — flag them
-                adv_s = f"{c['adv']:>6.2f}" if not c["feed_limited"] else "  ~fl"
-                gap_s = f"{c['gap']:>+6.2f}" if not c["feed_limited"] else "   ~fl"
+                if c["bad_realized"]:
+                    real_s, adv_s, gap_s = "   n/a", "   n/a", "    n/a"
+                else:
+                    real_s = f"{c['real']:>6.2f}"
+                    # feed-limited venues: realized is real, adv/gap aren't — flag them
+                    adv_s = f"{c['adv']:>6.2f}" if not c["feed_limited"] else "  ~fl"
+                    gap_s = f"{c['gap']:>+6.2f}" if not c["feed_limited"] else "   ~fl"
                 print(f"  {label:>5}  {mark:1} {c['venue']:<12} {c['conf']:>5} "
-                      f"{c['n']:>5} {c['real']:>6.2f} {adv_s} "
+                      f"{c['n']:>5} {real_s} {adv_s} "
                       f"{gap_s} {c['age']:>5.0f}  {note}")
                 label = ""  # rung label only on the block's first row
 
@@ -194,6 +203,8 @@ def main() -> None:
     print("  beats book? = realized pinned at the touch floor while the book advertised")
     print("                depth (post-trade match), or gap < -0.5bps — artifact, not ranked")
     print("  sparse      = n below threshold; shown for transparency, never ranked")
+    print("  thin/stale  = realized went non-physical (< -0.1bps, filled better than a stale")
+    print("                mid) on a thin cell — suppressed (n/a), not ranked")
     print("  ~fl / gap feed-limited = Pacifica's book refreshes faster than its snapshot feed,")
     print("                so its advertised/gap is under-measured; realized is still reliable")
     print("  depth-cut   = clips larger than the venue's visible book (excluded, not extrapolated)")

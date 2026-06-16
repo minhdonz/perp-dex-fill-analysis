@@ -39,7 +39,8 @@ def cell_json(c):
     if not c:
         return None
     return {"realized": round(c["real"], 3), "gap": round(c["gap"], 3),
-            "sparse": c["sparse"], "feed_limited": c["feed_limited"], "n": c["n"]}
+            "sparse": c["sparse"], "feed_limited": c["feed_limited"],
+            "bad_realized": c["bad_realized"], "n": c["n"]}
 
 
 def build_headline(gap):
@@ -83,7 +84,9 @@ def main() -> None:
     for a, rungs in gap.items():
         gap_out[a] = {str(r): {v: cell_json(cells.get(v)) for v in VENUES}
                       for r, cells in rungs.items()}
-        slippage[a] = {str(r): {v: (cell_json(cells.get(v)) or {}).get("realized")
+        # calculator slippage: null out thin/stale cells so they're never priced
+        slippage[a] = {str(r): {v: (round(c["real"], 3) if (c := cells.get(v))
+                                     and not c["bad_realized"] else None)
                                 for v in VENUES} for r, cells in rungs.items()}
     dump("gap.json", gap_out)
 

@@ -17,7 +17,7 @@ from statistics import median
 
 from analysis import cost, fees, funding, league, stress
 from analysis.netcost import net_cost
-from analysis.reconstruct import METHOD, RUNGS, touch_floor_bps
+from analysis.reconstruct import METHOD, NEG_REALIZED_LIMIT, RUNGS, touch_floor_bps
 
 VENUES = ["hyperliquid", "lighter", "pacifica"]
 CONF_LABEL = {"exact": "exact (order id)", "identity": "identity (taker+window)",
@@ -74,6 +74,8 @@ def compute_cost(conn, assets, since_ns, window_ms, rung, volume, hold_days, sid
             if not ms:
                 continue
             slip = median(s for s, _ in ms)
+            if slip < NEG_REALIZED_LIMIT:  # thin/stale cell — don't price it
+                continue
             fee, _ = cost.venue_fee_bps(conn, v, [k for _, k in ms], volume)
             fb, _ = funding.funding_cost_bps(conn, v, coin, hold_h, side)
             fb = fb or 0.0
@@ -170,6 +172,9 @@ def section_gap(gap):
                 c = cells[v]
                 if not c:
                     row.append("–")
+                    continue
+                if c["bad_realized"]:
+                    row.append("n/a")
                     continue
                 g = "fl" if c["feed_limited"] else f"{c['gap']:+.2f}"
                 txt = f"{c['real']:.2f} ({g}){'*' if c['sparse'] else ''}"
