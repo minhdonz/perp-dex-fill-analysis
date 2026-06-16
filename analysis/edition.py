@@ -1,4 +1,4 @@
-"""Edition assembler — turns the analyses into one markdown report (PRD §6, P0).
+"""Edition assembler: turns the analyses into one markdown report (PRD §6, P0).
 
 Sections: In plain English (auto-generated lay summary) · 1. The Gap ·
 2. True Cost to Hold · 3. Behavior Under Stress · 4. Methodology & Confidence ·
@@ -74,7 +74,7 @@ def compute_cost(conn, assets, since_ns, window_ms, rung, volume, hold_days, sid
             if not ms:
                 continue
             slip = median(s for s, _ in ms)
-            if slip < NEG_REALIZED_LIMIT:  # thin/stale cell — don't price it
+            if slip < NEG_REALIZED_LIMIT:  # thin/stale cell, don't price it
                 continue
             fee, _ = cost.venue_fee_bps(conn, v, [k for _, k in ms], volume)
             fb, _ = funding.funding_cost_bps(conn, v, coin, hold_h, side)
@@ -108,7 +108,7 @@ def section_plain_english(gap, cost_rows, rung, hold_days):
             s += (f", versus {pr['real']:.2f} bps (~${usd(pr['real'], rung):,.0f}) "
                   f"on {pr['venue']}")
             if ch["real"] > 0 and pr["real"] / ch["real"] >= 1.5:
-                s += f" — roughly {pr['real']/ch['real']:.0f}× more"
+                s += f", roughly {pr['real']/ch['real']:.0f}× more"
         L.append(s + ".")
         break
 
@@ -127,7 +127,7 @@ def section_plain_english(gap, cost_rows, rung, hold_days):
         mult, coin, ch, pr = best
         L.append(f"- The widest spread between venues was on **{coin}**: {ch['venue']} "
                  f"filled {rl} at ~{ch['real']:.2f} bps while {pr['venue']} charged "
-                 f"~{pr['real']:.2f} bps — **about {mult:.0f}× more expensive** for the "
+                 f"~{pr['real']:.2f} bps, **about {mult:.0f}× more expensive** for the "
                  "same trade.")
 
     # 3. cheapest to enter vs to hold (net cost) on BTC
@@ -146,8 +146,8 @@ def section_plain_english(gap, cost_rows, rung, hold_days):
     # 4. negative funding = paid to hold
     paid = sorted({r["asset"] for r in cost_rows if r["funding"] < -1})
     if paid:
-        L.append(f"- On **{', '.join(paid)}**, funding currently *pays* people who are long "
-                 "— so holding the position can earn money over the period rather than cost it.")
+        L.append(f"- On **{', '.join(paid)}**, funding currently *pays* people who are long, "
+                 "so holding the position can earn money over the period rather than cost it.")
     L.append("")
     return "\n".join(L)
 
@@ -186,7 +186,7 @@ def section_gap(gap):
 
 
 def section_cost(cost_rows, rung, volume, hold_days, side):
-    out = [f"\n## 2. True Cost to Hold — net cost at {rung_label(rung)}, "
+    out = [f"\n## 2. True Cost to Hold: net cost at {rung_label(rung)}, "
            f"${volume/1e6:.0f}M/14d fund, {side} {hold_days:g}d hold\n",
            "_Net = slippage + taker fee (both legs) + funding over the hold (bps)._\n",
            "| asset | venue | slip/leg | fee/leg | funding | round-trip |",
@@ -209,7 +209,7 @@ def section_stress(conn, assets, since_ns, threshold, bucket_min, merge_gap_min,
                    "the section fills in when one occurs.)")
         return "\n".join(out)
     for ev in events:
-        out.append(f"\n**Cascade {stress.fmt_t(ev['start'])} → {stress.fmt_t(ev['end'])}** — "
+        out.append(f"\n**Cascade {stress.fmt_t(ev['start'])} to {stress.fmt_t(ev['end'])}**: "
                    f"${ev['liq']:,.0f} liquidated.\n")
         out.append("| asset | venue | stress | baseline | Δ bps |")
         out.append("|---|---|---|---|---|")
@@ -236,10 +236,10 @@ def section_methodology(conn):
         total, gapped = conn.execute(
             "SELECT COUNT(*), COALESCE(SUM(has_gap),0) FROM window_summaries WHERE venue=?",
             (v,)).fetchone()
-        pct = f"{100*(total-gapped)/total:.1f}% of {total}" if total else "—"
+        pct = f"{100*(total-gapped)/total:.1f}% of {total}" if total else "n/a"
         out.append(f"| {v} | {CONF_LABEL[METHOD[v]]} | {pct} |")
     out.append("\n**Honest seams:**")
-    out.append("- **Pacifica advertised/gap is feed-limited** — its sub-10ms book refreshes "
+    out.append("- **Pacifica advertised/gap is feed-limited**: its sub-10ms book refreshes "
                "faster than its ~4/s snapshot feed, so the book-implied cost under-measures "
                "real fillable liquidity. We report Pacifica's *realized* cost, not its gap.")
     out.append("- **Funding is a trailing-average forward estimate** (mean-reverting; we also "
@@ -279,7 +279,7 @@ def main() -> None:
                              args.volume, args.hold_days, args.side)
 
     parts = [
-        f"# RealizedFill — Edition {today}\n",
+        f"# RealizedFill · Edition {today}\n",
         f"_Advertised-vs-realized execution quality across perp DEXs. "
         f"Window: last {args.hours:g}h · Venues: {', '.join(VENUES)} · "
         f"Assets: {', '.join(args.assets)}._\n",
