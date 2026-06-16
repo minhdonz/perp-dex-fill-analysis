@@ -23,8 +23,6 @@ a{color:var(--fg);text-decoration:none}
   height:54px;padding:0 24px;background:rgba(10,11,13,.82);backdrop-filter:saturate(140%) blur(10px);
   border-bottom:1px solid var(--line)}
 .brand{font-weight:600;letter-spacing:-.01em;color:#fff;display:flex;align-items:center;gap:9px}
-.brand::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent);
-  box-shadow:0 0 0 3px rgba(203,178,133,.14)}
 .nav nav{display:flex;gap:4px;flex-wrap:wrap}
 .nav nav a{color:var(--muted);font-size:13px;padding:6px 10px;border-radius:6px;transition:.12s}
 .nav nav a:hover{color:var(--fg);background:var(--panel2)}
