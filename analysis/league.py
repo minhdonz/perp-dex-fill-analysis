@@ -174,9 +174,11 @@ def main() -> None:
                     real_s, adv_s, gap_s = "   n/a", "   n/a", "    n/a"
                 else:
                     real_s = f"{c['real']:>6.2f}"
-                    # feed-limited venues: realized is real, adv/gap aren't — flag them
+                    # feed-limited venues: realized is real, adv/gap aren't, so flag them.
+                    # gap floored at 0 (a taker can't beat the pre-trade book; sub-zero is
+                    # book-age noise).
                     adv_s = f"{c['adv']:>6.2f}" if not c["feed_limited"] else "  ~fl"
-                    gap_s = f"{c['gap']:>+6.2f}" if not c["feed_limited"] else "   ~fl"
+                    gap_s = f"{max(c['gap'], 0):>6.2f}" if not c["feed_limited"] else "   ~fl"
                 print(f"  {label:>5}  {mark:1} {c['venue']:<12} {c['conf']:>5} "
                       f"{c['n']:>5} {real_s} {adv_s} "
                       f"{gap_s} {c['age']:>5.0f}  {note}")
@@ -199,9 +201,11 @@ def main() -> None:
         print(f"  {v:<12} {METHOD[v]:>10} {clips:>8} {meas:>9} {unm:>10} {depth:>10}")
 
     print("\n  ► cheapest realized among trustworthy, comparable cells")
+    print("  gap         = realized minus advertised, floored at 0 (a taker can't beat the")
+    print("                pre-trade book; sub-zero is book-age noise)")
     print("  at touch    = clip fills at the best level; cost is the spread (tick-limited)")
     print("  beats book? = realized pinned at the touch floor while the book advertised")
-    print("                depth (post-trade match), or gap < -0.5bps — artifact, not ranked")
+    print("                depth (post-trade match), or gap < -0.5bps; artifact, not ranked")
     print("  sparse      = n below threshold; shown for transparency, never ranked")
     print("  thin/stale  = realized went non-physical (< -0.1bps, filled better than a stale")
     print("                mid) on a thin cell — suppressed (n/a), not ranked")

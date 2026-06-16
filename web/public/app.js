@@ -52,7 +52,7 @@ function renderGapTable() {
       const c = cells[v];
       if (!c) { tr.appendChild(el("td", "muted", "–")); continue; }
       if (c.bad_realized) { const td = el("td", "muted", "n/a"); td.title = "thin/stale cell — realized non-physical, suppressed"; tr.appendChild(td); continue; }
-      const g = c.feed_limited ? `<span class="badge">fl</span>` : `${c.gap >= 0 ? "+" : ""}${c.gap.toFixed(2)}`;
+      const g = c.feed_limited ? `<span class="badge">fl</span>` : Math.max(c.gap, 0).toFixed(2);
       const star = c.sparse ? "<sup>*</sup>" : "";
       const td = el("td", v === best ? "best" : "", `${c.realized.toFixed(2)} <span class="g">(${g})</span>${star}`);
       tr.appendChild(td);

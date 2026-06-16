@@ -156,8 +156,10 @@ def section_gap(gap):
     out = ["## 1. The Gap: advertised vs realized execution cost\n",
            "_Each cell: a venue's **realized** fill cost (bps), with the **gap** in "
            "parentheses. Gap = realized minus advertised (what walking the book implied); "
-           "positive means it filled worse than the book promised. Cheapest realized in "
-           "**bold**. `fl` = Pacifica book feed-limited (realized shown, not gap)._\n"]
+           "positive means it filled worse than the book promised. The gap is floored at "
+           "zero, since a taker can't fill better than the pre-trade book (sub-zero is "
+           "book-age noise). Cheapest realized in **bold**. `fl` = Pacifica book "
+           "feed-limited (realized shown, not gap)._\n"]
     for coin, rungs in gap.items():
         out.append(f"\n**{coin}**\n")
         out.append("| rung | " + " | ".join(VENUES) + " |")
@@ -177,7 +179,7 @@ def section_gap(gap):
                 if c["bad_realized"]:
                     row.append("n/a")
                     continue
-                g = "fl" if c["feed_limited"] else f"{c['gap']:+.2f}"
+                g = "fl" if c["feed_limited"] else f"{max(c['gap'], 0):.2f}"
                 txt = f"{c['real']:.2f} ({g}){'*' if c['sparse'] else ''}"
                 row.append(f"**{txt}**" if v == best else txt)
             out.append("| " + " | ".join(row) + " |")
