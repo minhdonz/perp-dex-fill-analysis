@@ -153,10 +153,11 @@ def section_plain_english(gap, cost_rows, rung, hold_days):
 
 
 def section_gap(gap):
-    out = ["## 1. The Gap — advertised vs realized execution cost\n",
-           "_Realized cost per clip-size rung (bps), cheapest venue in **bold**. "
-           "`fl` = Pacifica's book is feed-limited (refreshes faster than snapshots), "
-           "so its gap isn't comparable; its realized cost is._\n"]
+    out = ["## 1. The Gap: advertised vs realized execution cost\n",
+           "_Each cell: a venue's **realized** fill cost (bps), with the **gap** in "
+           "parentheses. Gap = realized minus advertised (what walking the book implied); "
+           "positive means it filled worse than the book promised. Cheapest realized in "
+           "**bold**. `fl` = Pacifica book feed-limited (realized shown, not gap)._\n"]
     for coin, rungs in gap.items():
         out.append(f"\n**{coin}**\n")
         out.append("| rung | " + " | ".join(VENUES) + " |")

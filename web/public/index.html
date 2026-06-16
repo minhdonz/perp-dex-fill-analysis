@@ -30,7 +30,8 @@
 <main>
   <section id="gap" class="block">
     <h2>The Gap</h2>
-    <p class="sub">What a clip of each size actually cost (bps), vs what the order book advertised. <strong>Cheapest venue bold.</strong> <span class="badge">fl</span> = Pacifica book feed-limited (realized shown, not gap).</p>
+    <p class="sub">Each cell shows a venue's <strong>realized fill cost</strong> in bps, with the <strong>gap</strong> in parentheses. <em>Realized</em> is what a clip of that size actually filled at vs the mid; <em>advertised</em> is what walking the order book for that size implied; the <em>gap</em> is realized minus advertised, so a positive gap means the venue filled worse than its book promised. This is execution quality only. Fees and funding are added in "Cost to run a position" below. Cheapest realized in bold. <span class="badge">fl</span> = Pacifica book feed-limited (realized shown, not gap).</p>
+    <p class="key">cell format: <strong>realized</strong> <span class="muted">(gap vs advertised)</span></p>
     <div class="tabs" id="gap-tabs"></div>
     <div class="table-wrap"><table id="gap-table"></table></div>
     <div class="chart-box"><canvas id="gap-chart"></canvas></div>
