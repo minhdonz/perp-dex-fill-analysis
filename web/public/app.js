@@ -106,7 +106,10 @@ function renderCalc() {
     const slip = ((D.calc.slippage[asset] || {})[String(rung)] || {})[v];
     if (slip == null) continue;
     const fee = feeBps(v, vol), fund = fundingBps(v, asset, hold);
-    rows.push({ v, slip, fee, fund, rt: 2 * (slip + fee) + fund });
+    const apr = (D.calc.funding_apr[v] || {})[asset];
+    // side-adjusted annual rate, so its sign matches the funding bps shown
+    const effApr = apr == null ? null : (side === "long" ? 1 : -1) * apr;
+    rows.push({ v, slip, fee, fund, effApr, rt: 2 * (slip + fee) + fund });
   }
   rows.sort((a, b) => a.rt - b.rt);
   const maxRt = Math.max(1, ...rows.map((r) => Math.abs(r.rt)));
@@ -119,11 +122,11 @@ function renderCalc() {
       `<div class="cres-h"><b>${VLABEL[r.v]}</b>${i === 0 ? '<span class="tag">cheapest</span>' : ""}
        <span class="cres-net">${r.rt >= 0 ? "+" : ""}${r.rt.toFixed(2)} bps <em>(~$${dollars.toFixed(0)})</em></span></div>
        <div class="bar">${seg(2 * r.slip, "s-slip")}${seg(2 * r.fee, "s-fee")}${r.fund > 0 ? seg(r.fund, "s-fund") : ""}</div>
-       <div class="cres-d">slip ${(2 * r.slip).toFixed(2)} · fee ${(2 * r.fee).toFixed(2)} · funding ${r.fund >= 0 ? "+" : ""}${r.fund.toFixed(2)}${r.fund < 0 ? " (paid to you)" : ""}${r.v === "pacifica" ? " · realized (book feed-limited)" : ""}${r.v === "lighter" ? " · standard acct (0 fee)" : ""}</div>`;
+       <div class="cres-d">slip ${(2 * r.slip).toFixed(2)} · fee ${(2 * r.fee).toFixed(2)} · funding ${r.fund >= 0 ? "+" : ""}${r.fund.toFixed(2)}${r.effApr != null ? ` (${r.effApr >= 0 ? "+" : ""}${(r.effApr * 100).toFixed(1)}% APR over ${hold}d)` : ""}${r.fund < 0 ? ", paid to you" : ""}${r.v === "pacifica" ? " · realized (book feed-limited)" : ""}${r.v === "lighter" ? " · standard acct (0 fee)" : ""}</div>`;
     box.appendChild(row);
   });
   if (!rows.length) box.innerHTML = '<p class="muted">No clips of this size observed for this asset in-window.</p>';
-  $("#c-note").textContent = "Round-trip = enter + hold + exit. Fees: HL/Pacifica priced at your volume tier; Lighter standard account (0). Funding over your hold (negative = you're paid).";
+  $("#c-note").textContent = "All figures are bps of notional (round-trip = enter + hold + exit). Fees: HL/Pacifica priced at your volume tier; Lighter standard account (0). Funding is shown as bps charged over your hold, with the venue's annualized rate (APR) in parentheses; negative = you're paid.";
 }
 
 // ---------- Track record ----------
