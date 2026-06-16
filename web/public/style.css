@@ -53,6 +53,11 @@ main{max-width:1140px;margin:0 auto;padding:0 24px}
 .badge{display:inline-block;background:var(--accent-dim);color:var(--accent);border:1px solid #3a3320;
   border-radius:4px;padding:0 6px;font-size:11px;font-family:var(--mono)}
 .mgloss{font-size:12px;display:inline-block;margin-top:3px;line-height:1.45}
+.chip{display:inline-block;border-radius:4px;padding:1px 7px;font:500 11px var(--mono);white-space:nowrap}
+.chip-long{background:rgba(224,121,95,.14);color:var(--pos)}
+.chip-short{background:rgba(111,174,142,.14);color:var(--neg)}
+.stab{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.s-ok{background:var(--neg)}.s-mid{background:var(--accent)}.s-bad{background:var(--pos)}
 
 /* ---- tabs / toggles ---- */
 .tabs{display:inline-flex;gap:2px;flex-wrap:wrap;margin-bottom:18px;background:var(--panel);

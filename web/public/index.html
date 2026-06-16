@@ -17,6 +17,7 @@
   <nav>
     <a href="#gap">The Gap</a>
     <a href="#cost">Cost</a>
+    <a href="#funding">Funding</a>
     <a href="#track">Track Record</a>
     <a href="#stress">Stress</a>
     <a href="#method">Method</a>
@@ -38,6 +39,7 @@
     <p class="key">cell format: <strong>realized</strong> <span class="muted">(gap vs advertised)</span></p>
     <div class="tabs" id="gap-tabs"></div>
     <div class="table-wrap"><table id="gap-table"></table></div>
+    <p class="key">Hover any cell or chart point for its clip count (n).</p>
     <div class="chart-box"><canvas id="gap-chart"></canvas></div>
   </section>
 
@@ -76,6 +78,15 @@
       <div class="results" id="c-results"></div>
       <p class="note" id="c-note"></p>
     </div>
+  </section>
+
+  <section id="funding" class="block">
+    <h2>Funding &amp; carry</h2>
+    <p class="lede">Who pays you to hold, and how dependable the rate is.</p>
+    <p class="sub">Funding is the recurring payment between longs and shorts for holding a perp. A positive APR means longs pay shorts; negative means shorts pay longs (you're paid to be long). The rate resets hourly and drifts, so a trailing average alone can mislead: the stability columns show how often the rate changed sign (flip rate) and how directional it has been, so you can tell a dependable carry from a whippy one.</p>
+    <div class="tabs" id="fund-tabs"></div>
+    <div class="table-wrap"><table id="fund-table"></table></div>
+    <p class="note" id="fund-note"></p>
   </section>
 
   <section id="track" class="block">

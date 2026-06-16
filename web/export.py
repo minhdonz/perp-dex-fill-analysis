@@ -109,6 +109,20 @@ def main() -> None:
         },
     })
 
+    # ---- funding.json (carry: APR + stability, same source as calc.funding_apr) ----
+    def fund_cell(v, a):
+        rate = funding.get_rate(conn, v, a)
+        if rate is None:
+            return None
+        _, apr, n = rate
+        stab = funding.get_stability(conn, v, a) or (None, None, None, None)
+        pct_pos, flip, std, _ = stab
+        return {"apr": round(apr, 6), "pct_positive": pct_pos, "flip_rate": flip,
+                "std_hourly": std, "n": n}
+    fund = {a: {v: c for v in VENUES if (c := fund_cell(v, a))} for a in ASSETS}
+    dump("funding.json", {"as_of": int(fts / 1e9) if fts else None,
+                          "window_days": fwin, "assets": fund})
+
     # ---- history.json (gap_windows + funding_windows; daily + 12 session windows) ----
     daykey = lambda w: time.strftime("%Y-%m-%d", time.gmtime(w / 1e9))
     sesskey = lambda w: int((w % history.DAY_NS) // history.WINDOW_NS)

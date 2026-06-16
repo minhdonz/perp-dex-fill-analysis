@@ -15,7 +15,10 @@ if (window.Chart) {
     backgroundColor: "#15171a", borderColor: "#2b2e33", borderWidth: 1,
     titleColor: "#e7e9ec", bodyColor: "#cdd0d5", titleFont: { weight: "500" },
     padding: 10, cornerRadius: 8, usePointStyle: true, boxPadding: 6,
-    callbacks: { label: (c) => ` ${c.dataset.label}  ${c.parsed.y != null ? c.parsed.y.toFixed(2) + " bps" : "n/a"}` },
+    callbacks: { label: (c) => {
+      const n = c.dataset.n?.[c.dataIndex];
+      return ` ${c.dataset.label}  ${c.parsed.y != null ? c.parsed.y.toFixed(2) + " bps" : "n/a"}${n != null ? `  ·  n=${n}` : ""}`;
+    } },
   });
   // vertical crosshair guide, drawn only for line charts
   Chart.register({
@@ -41,7 +44,7 @@ const fmtUsd = (v) => v >= 1e9 ? `$${(v/1e9).toFixed(v%1e9?1:0)}B` : v >= 1e6 ? 
 const rungLabel = (r) => r < 1e6 ? `$${r/1e3}k` : `$${r/1e6}M`;
 
 async function load() {
-  const names = ["meta", "gap", "calc", "history", "stress", "coverage"];
+  const names = ["meta", "gap", "calc", "history", "stress", "coverage", "funding"];
   const res = await Promise.all(names.map((n) => fetch(`data/${n}.json`).then((r) => r.json())));
   names.forEach((n, i) => (D[n] = res[i]));
 }
@@ -84,6 +87,7 @@ function renderGapTable() {
       const g = c.feed_limited ? `<span class="badge">fl</span>` : Math.max(c.gap, 0).toFixed(2);
       const star = c.sparse ? "<sup>*</sup>" : "";
       const td = el("td", v === best ? "best" : "", `${c.realized.toFixed(2)} <span class="g">(${g})</span>${star}`);
+      if (c.n != null) td.title = `n=${c.n} clips`;
       tr.appendChild(td);
     }
     t.appendChild(tr);
@@ -94,13 +98,15 @@ function renderGapChart() {
   const labels = D.calc.rungs.filter((r) => rungs[String(r)]).map(rungLabel);
   const data = {
     labels,
-    datasets: VENUES.map((v) => ({
-      label: VLABEL[v], backgroundColor: VCOLOR[v],
-      borderRadius: 3, maxBarThickness: 40, categoryPercentage: 0.7, barPercentage: 0.9,
-      data: D.calc.rungs.filter((r) => rungs[String(r)]).map((r) => {
-        const c = rungs[String(r)][v]; return c && !c.bad_realized ? c.realized : null;
-      }),
-    })),
+    datasets: VENUES.map((v) => {
+      const shown = D.calc.rungs.filter((r) => rungs[String(r)]);
+      return {
+        label: VLABEL[v], backgroundColor: VCOLOR[v],
+        borderRadius: 3, maxBarThickness: 40, categoryPercentage: 0.7, barPercentage: 0.9,
+        data: shown.map((r) => { const c = rungs[String(r)][v]; return c && !c.bad_realized ? c.realized : null; }),
+        n: shown.map((r) => { const c = rungs[String(r)][v]; return c && !c.bad_realized ? c.n : null; }),
+      };
+    }),
   };
   if (gapChart) gapChart.destroy();
   gapChart = new Chart($("#gap-chart"), {
@@ -163,6 +169,51 @@ function renderCalc() {
   $("#c-note").textContent = `All figures are bps of notional (round-trip = enter + hold + exit). Fees: HL/Pacifica priced at your volume tier; Lighter standard account (0). Funding is shown as bps charged over your hold, with the venue's annualized rate (APR) in parentheses; negative = you're paid. Funding APR is a trailing ${fundWin}-day average${fundAsOf ? `, as of ${fundAsOf}` : ""}.`;
 }
 
+// ---------- Funding & carry ----------
+let fundAsset = "BTC";
+function fundAssets() {
+  return D.meta.assets.filter((a) => D.funding.assets[a] && Object.keys(D.funding.assets[a]).length);
+}
+function renderFundTabs() {
+  const tabs = $("#fund-tabs"); tabs.innerHTML = "";
+  const assets = fundAssets();
+  if (!assets.includes(fundAsset)) fundAsset = assets[0];
+  assets.forEach((a) => {
+    const b = el("button", a === fundAsset ? "on" : "", a);
+    b.onclick = () => { fundAsset = a; renderFundTabs(); renderFundTable(); };
+    tabs.appendChild(b);
+  });
+}
+function stabBand(flip) {
+  if (flip == null) return ["", ""];
+  if (flip < 0.15) return ["stable", "s-ok"];
+  if (flip <= 0.40) return ["variable", "s-mid"];
+  return ["whippy", "s-bad"];
+}
+function renderFundTable() {
+  const t = $("#fund-table"); t.innerHTML = "";
+  t.appendChild(el("tr", "", "<th>venue</th><th>funding APR</th><th>direction</th><th>consistency</th><th>stability (flip rate)</th><th>volatility</th><th>hrs</th>"));
+  const cells = D.funding.assets[fundAsset] || {};
+  for (const v of VENUES) {
+    const c = cells[v];
+    if (!c) { t.appendChild(el("tr", "", `<td>${VLABEL[v]}</td><td class="muted" colspan="6">no data</td>`)); continue; }
+    const apr = c.apr * 100;
+    const dir = c.apr >= 0 ? `<span class="chip chip-long">longs pay</span>` : `<span class="chip chip-short">shorts pay</span>`;
+    const pos = c.pct_positive == null ? "–" : `${Math.round(c.pct_positive * 100)}% of hrs +`;
+    const [word, cls] = stabBand(c.flip_rate);
+    const flip = c.flip_rate == null ? "–" : `<span class="stab ${cls}"></span>${Math.round(c.flip_rate * 100)}% <span class="muted">${word}</span>`;
+    const vol = c.std_hourly == null ? "–" : `${(c.std_hourly * 1e4).toFixed(2)} bps/hr`;
+    t.appendChild(el("tr", "",
+      `<td>${VLABEL[v]}</td><td>${apr >= 0 ? "+" : ""}${apr.toFixed(1)}%</td><td>${dir}</td><td>${pos}</td><td>${flip}</td><td>${vol}</td><td>${c.n ?? "–"}</td>`));
+  }
+}
+function renderFundNote() {
+  const win = D.funding.window_days ?? 14;
+  const asOf = D.funding.as_of
+    ? new Date(D.funding.as_of * 1000).toISOString().slice(0, 16).replace("T", " ") + " UTC" : null;
+  $("#fund-note").textContent = `Funding APR is the trailing ${win}-day average${asOf ? `, as of ${asOf}` : ""}. Positive APR means longs pay shorts. Flip rate is how often the hourly rate changed sign; higher means less dependable as carry. Volatility is the standard deviation of the hourly rate.`;
+}
+
 // ---------- Track record ----------
 let trackChart;
 function renderTrack() {
@@ -173,9 +224,11 @@ function renderTrack() {
     labels: allDates,
     datasets: VENUES.filter((v) => vd[v]).map((v) => {
       const m = Object.fromEntries(vd[v].daily.map((d) => [d.t, d[metric]]));
+      const mn = Object.fromEntries(vd[v].daily.map((d) => [d.t, d.n]));
       return { label: VLABEL[v], borderColor: VCOLOR[v], backgroundColor: VCOLOR[v],
                borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, spanGaps: true,
-               tension: 0.3, data: allDates.map((d) => m[d] ?? null) };
+               tension: 0.3, data: allDates.map((d) => m[d] ?? null),
+               n: allDates.map((d) => mn[d] ?? null) };
     }),
   };
   if (trackChart) trackChart.destroy();
@@ -198,11 +251,12 @@ function renderHeatmap(vd) {
   VENUES.forEach((v) => {
     hm.appendChild(el("div", "hm-v", VLABEL[v]));
     const m = Object.fromEntries((vd[v]?.session || []).map((s) => [s.b, s.realized]));
+    const mn = Object.fromEntries((vd[v]?.session || []).map((s) => [s.b, s.n]));
     for (let b = 0; b < 12; b++) {
       const val = m[b];
-      const c = el("div", "hm-c", val == null ? "" : val.toFixed(1));
+      const c = el("div", "hm-c", val == null ? "" : val.toFixed(2));
       if (val != null) c.style.background = `rgba(95,179,179,${0.06 + 0.5 * Math.min(1, val / max)})`;
-      c.title = val == null ? "no data" : `${val.toFixed(2)} bps`;
+      c.title = val == null ? "no data" : `${val.toFixed(2)} bps · n=${mn[b]}`;
       hm.appendChild(c);
     }
   });
@@ -268,6 +322,8 @@ function init() {
     side = b.dataset.side; document.querySelectorAll(".toggle button").forEach((x) => x.classList.toggle("on", x === b)); renderCalc();
   });
   renderCalc();
+
+  renderFundTabs(); renderFundTable(); renderFundNote();
 
   const assetsWithHist = D.meta.assets.filter((a) => D.history[a] && Object.keys(D.history[a]).length);
   fillSelect($("#t-asset"), assetsWithHist.length ? assetsWithHist : ["BTC"], "BTC");
