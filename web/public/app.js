@@ -174,13 +174,13 @@ function renderStress() {
   const box = $("#stress-body"); box.innerHTML = "";
   const ev = D.stress.events || [];
   if (!ev.length) {
-    box.innerHTML = `<p class="empty">No market-wide cascade above $${(D.stress.threshold / 1e6).toFixed(0)}M in the current window. The detector is live — this fills in when one occurs.</p>`;
+    box.innerHTML = `<p class="empty">No market-wide cascade above $${(D.stress.threshold / 1e6).toFixed(0)}M in the current window. The detector is live and fills in when one occurs.</p>`;
     return;
   }
   ev.slice().reverse().forEach((e) => {
     const card = el("div", "scard");
     const t = new Date(e.start * 1000).toISOString().slice(0, 16).replace("T", " ");
-    card.appendChild(el("h3", "", `${t} UTC — $${e.liq.toLocaleString()} liquidated`));
+    card.appendChild(el("h3", "", `${t} UTC · $${e.liq.toLocaleString()} liquidated`));
     const tbl = el("table");
     tbl.appendChild(el("tr", "", "<th>asset</th><th>venue</th><th>stress</th><th>baseline</th><th>Δ</th>"));
     e.degr.forEach((d) => {
@@ -196,7 +196,7 @@ function renderMethod() {
   const t = $("#cov-table"); t.innerHTML = "";
   t.appendChild(el("tr", "", "<th>venue</th><th>method</th><th>clean windows</th>"));
   D.coverage.venues.forEach((c) => {
-    t.appendChild(el("tr", "", `<td>${VLABEL[c.venue]}</td><td>${c.method}</td><td>${c.clean_pct == null ? "—" : c.clean_pct + "% of " + c.windows}</td>`));
+    t.appendChild(el("tr", "", `<td>${VLABEL[c.venue]}</td><td>${c.method}</td><td>${c.clean_pct == null ? "n/a" : c.clean_pct + "% of " + c.windows}</td>`));
   });
   const ul = $("#seams"); ul.innerHTML = "";
   D.coverage.seams.forEach((s) => ul.appendChild(el("li", "", s)));

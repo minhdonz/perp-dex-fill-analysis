@@ -24,11 +24,11 @@ from analysis.reconstruct import METHOD, RUNGS  # noqa: E402
 VENUES = ["hyperliquid", "lighter", "pacifica"]
 ASSETS = ["BTC", "ETH", "SOL", "HYPE", "ZEC"]
 SEAMS = [
-    "Pacifica's advertised/gap is feed-limited — its sub-10ms book refreshes faster than its "
+    "Pacifica's advertised/gap is feed-limited: its sub-10ms book refreshes faster than its "
     "snapshot feed, so we report Pacifica's realized cost, not its book-relative gap.",
     "Funding is a trailing-average forward estimate (mean-reverting), not a guarantee.",
-    "Cascade signal is OKX market-wide (Binance is geo-restricted from our host) — a top "
-    "venue but a thinner proxy than the whole market.",
+    "Cascade signal is OKX market-wide (Binance is geo-restricted from our host). OKX is a "
+    "top venue but a thinner proxy than the whole market.",
     "Sparse rungs (few clips of a size in-window) are flagged, never fabricated.",
     "Hyperliquid's book is top-20 levels on its public feed; clips deeper than visible depth "
     "are excluded, not extrapolated.",
@@ -51,8 +51,7 @@ def build_headline(gap):
             ch, pr = edition.cheapest(cells), edition.priciest(cells)
             if ch and pr and ch["venue"] != pr["venue"] and pr["real"] > ch["real"] + 0.05:
                 return (f"{ch['venue'].title()} fills {edition.rung_label(rung)} {coin} at "
-                        f"{ch['real']:.2f} bps; {pr['venue'].title()} at {pr['real']:.2f} "
-                        f"— that's the gap.")
+                        f"{ch['real']:.2f} bps; {pr['venue'].title()} at {pr['real']:.2f} bps.")
     return "Advertised depth vs realized fills across perp DEXs, tracked over time."
 
 

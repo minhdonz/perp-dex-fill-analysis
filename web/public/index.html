@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RealizedFill — perp DEX execution quality</title>
+<title>RealizedFill · perp DEX execution quality</title>
 <meta name="description" content="Advertised vs realized execution cost across perp DEXs, tracked over time. Read-only, no capital.">
 <link rel="stylesheet" href="style.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -24,12 +24,12 @@
 <section id="hero">
   <h1 id="headline">Loading…</h1>
   <p class="tagline">Depth is what the book shows. Execution quality is what you actually get. This measures the second.</p>
-  <p class="trust">Read-only measurement of public trade &amp; book feeds — no capital, no orders, no wallets.</p>
+  <p class="trust">Read-only measurement of public trade and book feeds. No capital, no orders, no wallets.</p>
 </section>
 
 <main>
   <section id="gap" class="block">
-    <h2>The Gap — advertised vs realized</h2>
+    <h2>The Gap</h2>
     <p class="sub">What a clip of each size actually cost (bps), vs what the order book advertised. <strong>Cheapest venue bold.</strong> <span class="badge">fl</span> = Pacifica book feed-limited (realized shown, not gap).</p>
     <div class="tabs" id="gap-tabs"></div>
     <div class="table-wrap"><table id="gap-table"></table></div>
@@ -38,7 +38,7 @@
 
   <section id="cost" class="block">
     <h2>Cost to run a position</h2>
-    <p class="sub">Your all-in cost — slippage + taker fee (both legs) + funding over the hold. Computed live in your browser from your inputs.</p>
+    <p class="sub">Your all-in cost: slippage + taker fee (both legs) + funding over the hold. Computed live in your browser from your inputs.</p>
     <div class="calc">
       <div class="controls">
         <label>Asset <select id="c-asset"></select></label>
@@ -58,7 +58,7 @@
 
   <section id="track" class="block">
     <h2>Track record</h2>
-    <p class="sub">How the gap and cost evolve over time — the part a live snapshot can't show. History compounds.</p>
+    <p class="sub">How the gap and cost evolve over time, which a static snapshot can't capture. History compounds.</p>
     <div class="controls">
       <label>Asset <select id="t-asset"></select></label>
       <label>Clip size <select id="t-rung"></select></label>
