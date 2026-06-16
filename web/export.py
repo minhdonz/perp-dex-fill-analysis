@@ -92,10 +92,15 @@ def main() -> None:
 
     fapr = {v: {a: (round(row[1], 6) if (row := funding.get_rate(conn, v, a)) else None)
                 for a in ASSETS} for v in VENUES}
+    # funding lookback window + when the rates were last fetched (one cron run)
+    fwin, fts = conn.execute(
+        "SELECT MAX(window_days), MAX(fetched_ns) FROM funding_rates").fetchone()
     dump("calc.json", {
         "rungs": RUNGS,
         "slippage": slippage,
         "funding_apr": fapr,  # fraction/yr; net funding bps = apr*hold_days/365*1e4*side
+        "funding_window_days": fwin,
+        "funding_as_of": int(fts / 1e9) if fts else None,
         "fee_ladders": {
             "hyperliquid": fees.HL_TIERS,   # [ [vol_cutoff, taker_frac, maker_frac], ... ]
             "pacifica": fees.PACIFICA_TIERS,

@@ -99,6 +99,7 @@ function fundingBps(venue, asset, holdDays) {
 function renderCalc() {
   const asset = $("#c-asset").value, rung = +$("#c-size").value;
   const vol = VOL_STOPS[+$("#c-vol").value], hold = +$("#c-hold").value;
+  const fundWin = D.calc.funding_window_days ?? 14;
   $("#c-vol-val").textContent = fmtUsd(vol) + " / 14d";
   $("#c-hold-val").textContent = hold + " d";
   const rows = [];
@@ -122,11 +123,14 @@ function renderCalc() {
       `<div class="cres-h"><b>${VLABEL[r.v]}</b>${i === 0 ? '<span class="tag">cheapest</span>' : ""}
        <span class="cres-net">${r.rt >= 0 ? "+" : ""}${r.rt.toFixed(2)} bps <em>(~$${dollars.toFixed(0)})</em></span></div>
        <div class="bar">${seg(2 * r.slip, "s-slip")}${seg(2 * r.fee, "s-fee")}${r.fund > 0 ? seg(r.fund, "s-fund") : ""}</div>
-       <div class="cres-d">slip ${(2 * r.slip).toFixed(2)} · fee ${(2 * r.fee).toFixed(2)} · funding ${r.fund >= 0 ? "+" : ""}${r.fund.toFixed(2)}${r.effApr != null ? ` (${r.effApr >= 0 ? "+" : ""}${(r.effApr * 100).toFixed(1)}% APR over ${hold}d)` : ""}${r.fund < 0 ? ", paid to you" : ""}${r.v === "pacifica" ? " · realized (book feed-limited)" : ""}${r.v === "lighter" ? " · standard acct (0 fee)" : ""}</div>`;
+       <div class="cres-d">slip ${(2 * r.slip).toFixed(2)} · fee ${(2 * r.fee).toFixed(2)} · funding ${r.fund >= 0 ? "+" : ""}${r.fund.toFixed(2)}${r.effApr != null ? ` (${r.effApr >= 0 ? "+" : ""}${(r.effApr * 100).toFixed(1)}% APR, ${fundWin}d avg)` : ""}${r.fund < 0 ? ", paid to you" : ""}${r.v === "pacifica" ? " · realized (book feed-limited)" : ""}${r.v === "lighter" ? " · standard acct (0 fee)" : ""}</div>`;
     box.appendChild(row);
   });
   if (!rows.length) box.innerHTML = '<p class="muted">No clips of this size observed for this asset in-window.</p>';
-  $("#c-note").textContent = "All figures are bps of notional (round-trip = enter + hold + exit). Fees: HL/Pacifica priced at your volume tier; Lighter standard account (0). Funding is shown as bps charged over your hold, with the venue's annualized rate (APR) in parentheses; negative = you're paid.";
+  const fundAsOf = D.calc.funding_as_of
+    ? new Date(D.calc.funding_as_of * 1000).toISOString().slice(0, 16).replace("T", " ") + " UTC"
+    : null;
+  $("#c-note").textContent = `All figures are bps of notional (round-trip = enter + hold + exit). Fees: HL/Pacifica priced at your volume tier; Lighter standard account (0). Funding is shown as bps charged over your hold, with the venue's annualized rate (APR) in parentheses; negative = you're paid. Funding APR is a trailing ${fundWin}-day average${fundAsOf ? `, as of ${fundAsOf}` : ""}.`;
 }
 
 // ---------- Track record ----------
