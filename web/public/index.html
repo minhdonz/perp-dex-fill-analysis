@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RealizedFill · perp DEX execution quality</title>
 <meta name="description" content="Advertised vs realized execution cost across perp DEXs, tracked over time. Read-only, no capital.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
@@ -22,14 +25,16 @@
 </header>
 
 <section id="hero">
+  <p class="eyebrow">Perp DEX execution quality</p>
   <h1 id="headline">Loading…</h1>
-  <p class="tagline">Depth is what the book shows. Execution quality is what you actually get. This measures the second.</p>
-  <p class="trust">Read-only measurement of public trade and book feeds. No capital, no orders, no wallets.</p>
+  <p class="tagline">Depth is what the book shows. Execution quality is what you actually get. This measures the second, across Hyperliquid, Lighter, and Pacifica, and tracks it over time.</p>
+  <p class="trust">Read-only. Public feeds. No capital, no orders, no wallets.</p>
 </section>
 
 <main>
   <section id="gap" class="block">
     <h2>The Gap</h2>
+    <p class="lede">What the book promised vs what you actually filled.</p>
     <p class="sub">Each cell shows a venue's <strong>realized fill cost</strong> in bps, with the <strong>gap</strong> in parentheses. <em>Realized</em> is what a clip of that size actually filled at vs the mid; <em>advertised</em> is what walking the order book for that size implied; the <em>gap</em> is realized minus advertised, so a positive gap means the venue filled worse than its book promised. The gap is floored at zero: a venue can't truly fill better than the book that existed before the trade, so any sub-zero value (book-age noise) shows as 0. This is execution quality only. Fees and funding are added in "Cost to run a position" below. Cheapest realized in bold. <span class="badge">fl</span> = Pacifica book feed-limited (realized shown, not gap).</p>
     <p class="key">cell format: <strong>realized</strong> <span class="muted">(gap vs advertised)</span></p>
     <div class="tabs" id="gap-tabs"></div>
@@ -39,6 +44,7 @@
 
   <section id="cost" class="block">
     <h2>Cost to run a position</h2>
+    <p class="lede">Your all-in cost, sized to your own volume and hold.</p>
     <p class="sub">Your all-in cost: slippage + taker fee (both legs) + funding over the hold. Computed live in your browser from your inputs.</p>
     <div class="calc">
       <div class="controls">
@@ -64,6 +70,7 @@
 
   <section id="track" class="block">
     <h2>Track record</h2>
+    <p class="lede">How execution holds up over time, not just today.</p>
     <p class="sub">How the gap and cost evolve over time, which a static snapshot can't capture. History compounds.</p>
     <div class="controls">
       <label>Asset <select id="t-asset"></select></label>
@@ -77,13 +84,15 @@
 
   <section id="stress" class="block">
     <h2>Behavior under stress</h2>
+    <p class="lede">Does fill quality hold when the market breaks?</p>
     <p class="sub">When the market gets liquidated, does fill quality hold? Cascades from the market-wide liquidation feed; execution during vs the prior-24h baseline.</p>
     <div id="stress-body"></div>
   </section>
 
   <section id="method" class="block">
     <h2>Methodology &amp; confidence</h2>
-    <p class="sub">What's measured, how, and where the seams are. A single trade usually fills in many small pieces; before measuring its cost we group those pieces back into the one order the trader actually sent. How precisely we can do that depends on what each venue publishes, shown in the table below. We also slice the data into 2-hour windows: a window is "clean" if no feed disconnect or data gap was detected during it, and windows with a gap are dropped from every number above, so a brief outage is never mistaken for a real reading. The last column shows each venue's share of clean windows, i.e. how reliably we captured its data.</p>
+    <p class="lede">What's measured, how, and where the seams are.</p>
+    <p class="sub">A single trade usually fills in many small pieces; before measuring its cost we group those pieces back into the one order the trader actually sent. How precisely we can do that depends on what each venue publishes, shown in the table below. We also slice the data into 2-hour windows: a window is "clean" if no feed disconnect or data gap was detected during it, and windows with a gap are dropped from every number above, so a brief outage is never mistaken for a real reading. The last column shows each venue's share of clean windows, i.e. how reliably we captured its data.</p>
     <div class="table-wrap"><table id="cov-table"></table></div>
     <ul id="seams"></ul>
   </section>

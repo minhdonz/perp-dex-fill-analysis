@@ -2,7 +2,9 @@
 
 const VENUES = ["hyperliquid", "lighter", "pacifica"];
 const VLABEL = { hyperliquid: "Hyperliquid", lighter: "Lighter", pacifica: "Pacifica" };
-const VCOLOR = { hyperliquid: "#5eead4", lighter: "#a78bfa", pacifica: "#fbbf24" };
+const VCOLOR = { hyperliquid: "#5fb3b3", lighter: "#9b8cf0", pacifica: "#d6a85c" };
+const AXIS = "#6b6f78", GRID = "#1c1e22", LEGEND_FG = "#9296a0";
+if (window.Chart) { Chart.defaults.font.family = "JetBrains Mono, ui-monospace, monospace"; Chart.defaults.font.size = 11; Chart.defaults.color = AXIS; }
 const VOL_STOPS = [0, 5e6, 25e6, 50e6, 100e6, 250e6, 500e6, 1e9, 2e9, 7e9];
 const D = {};  // loaded JSON
 
@@ -67,6 +69,7 @@ function renderGapChart() {
     labels,
     datasets: VENUES.map((v) => ({
       label: VLABEL[v], backgroundColor: VCOLOR[v],
+      borderRadius: 3, maxBarThickness: 40, categoryPercentage: 0.7, barPercentage: 0.9,
       data: D.calc.rungs.filter((r) => rungs[String(r)]).map((r) => {
         const c = rungs[String(r)][v]; return c && !c.bad_realized ? c.realized : null;
       }),
@@ -75,10 +78,10 @@ function renderGapChart() {
   if (gapChart) gapChart.destroy();
   gapChart = new Chart($("#gap-chart"), {
     type: "bar", data,
-    options: { responsive: true, plugins: { legend: { labels: { color: "#cbd5e1" } } },
-      scales: { x: { ticks: { color: "#94a3b8" }, grid: { display: false } },
-                y: { title: { display: true, text: "realized cost (bps)", color: "#94a3b8" },
-                     ticks: { color: "#94a3b8" }, grid: { color: "#1e293b" } } } },
+    options: { responsive: true, plugins: { legend: { labels: { color: LEGEND_FG, boxWidth: 10, boxHeight: 10, usePointStyle: true, pointStyle: "rectRounded" } } },
+      scales: { x: { ticks: { color: AXIS }, grid: { display: false } },
+                y: { title: { display: true, text: "realized cost (bps)", color: AXIS },
+                     ticks: { color: AXIS }, grid: { color: GRID } } } },
   });
 }
 
@@ -144,16 +147,17 @@ function renderTrack() {
     datasets: VENUES.filter((v) => vd[v]).map((v) => {
       const m = Object.fromEntries(vd[v].daily.map((d) => [d.t, d[metric]]));
       return { label: VLABEL[v], borderColor: VCOLOR[v], backgroundColor: VCOLOR[v],
-               spanGaps: true, tension: 0.2, data: allDates.map((d) => m[d] ?? null) };
+               borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, spanGaps: true,
+               tension: 0.3, data: allDates.map((d) => m[d] ?? null) };
     }),
   };
   if (trackChart) trackChart.destroy();
   trackChart = new Chart($("#track-chart"), {
     type: "line", data,
-    options: { responsive: true, plugins: { legend: { labels: { color: "#cbd5e1" } } },
-      scales: { x: { ticks: { color: "#94a3b8" }, grid: { display: false } },
-                y: { title: { display: true, text: metric + " (bps)", color: "#94a3b8" },
-                     ticks: { color: "#94a3b8" }, grid: { color: "#1e293b" } } } },
+    options: { responsive: true, plugins: { legend: { labels: { color: LEGEND_FG, boxWidth: 10, boxHeight: 10, usePointStyle: true, pointStyle: "rectRounded" } } },
+      scales: { x: { ticks: { color: AXIS }, grid: { display: false } },
+                y: { title: { display: true, text: metric + " (bps)", color: AXIS },
+                     ticks: { color: AXIS }, grid: { color: GRID } } } },
   });
   renderHeatmap(vd);
 }
@@ -170,7 +174,7 @@ function renderHeatmap(vd) {
     for (let b = 0; b < 12; b++) {
       const val = m[b];
       const c = el("div", "hm-c", val == null ? "" : val.toFixed(1));
-      if (val != null) c.style.background = `rgba(94,234,212,${0.12 + 0.8 * Math.min(1, val / max)})`;
+      if (val != null) c.style.background = `rgba(95,179,179,${0.06 + 0.5 * Math.min(1, val / max)})`;
       c.title = val == null ? "no data" : `${val.toFixed(2)} bps`;
       hm.appendChild(c);
     }
