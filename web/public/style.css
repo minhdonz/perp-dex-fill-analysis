@@ -88,14 +88,18 @@ td.rung{color:var(--muted);font-family:var(--mono)}
   border-radius:10px;padding:18px}
 
 /* ---- controls ---- */
-.controls{display:flex;gap:22px;flex-wrap:wrap;align-items:end;margin-bottom:22px;
+.controls{display:flex;gap:24px;flex-wrap:wrap;align-items:start;margin-bottom:22px;
   background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
-.controls label{display:flex;flex-direction:column;gap:8px;font-size:11px;color:var(--faint);
-  font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase}
-.controls select{background:var(--panel2);color:var(--fg);border:1px solid var(--line2);
-  border-radius:7px;padding:8px 10px;font:13px var(--sans);min-width:96px}
+.controls label{display:grid;grid-template-rows:14px 36px;row-gap:10px}
+.ctl-h{display:flex;align-items:baseline;gap:8px;height:14px;line-height:14px;white-space:nowrap;
+  font-size:11px;color:var(--faint);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.controls label > select,
+.controls label > .toggle,
+.controls label > input[type=range]{align-self:center}
+.controls select{height:36px;background:var(--panel2);color:var(--fg);border:1px solid var(--line2);
+  border-radius:7px;padding:0 10px;font:13px var(--sans);min-width:104px}
 .controls select:focus{outline:0;border-color:var(--accent)}
-.controls input[type=range]{width:210px;accent-color:var(--accent);background:transparent}
+.controls input[type=range]{width:210px;height:18px;accent-color:var(--accent);background:transparent;margin:0}
 .val{color:var(--fg);font-weight:500;font-family:var(--mono);text-transform:none;letter-spacing:0;font-size:13px}
 
 /* ---- cost results ---- */

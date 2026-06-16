@@ -48,13 +48,24 @@
     <p class="sub">Your all-in cost: slippage + taker fee (both legs) + funding over the hold. Computed live in your browser from your inputs.</p>
     <div class="calc">
       <div class="controls">
-        <label>Asset <select id="c-asset"></select></label>
-        <label>Clip size <select id="c-size"></select></label>
-        <label>Your 14-day volume <span class="val" id="c-vol-val"></span>
-          <input type="range" id="c-vol" min="0" max="9" step="1" value="5"></label>
-        <label>Hold <span class="val" id="c-hold-val"></span>
-          <input type="range" id="c-hold" min="0" max="30" step="0.5" value="7"></label>
-        <label>Side
+        <label>
+          <span class="ctl-h">Asset</span>
+          <select id="c-asset"></select>
+        </label>
+        <label>
+          <span class="ctl-h">Clip size</span>
+          <select id="c-size"></select>
+        </label>
+        <label>
+          <span class="ctl-h">Your 14-day volume <span class="val" id="c-vol-val"></span></span>
+          <input type="range" id="c-vol" min="0" max="9" step="1" value="5">
+        </label>
+        <label>
+          <span class="ctl-h">Hold <span class="val" id="c-hold-val"></span></span>
+          <input type="range" id="c-hold" min="0" max="30" step="0.5" value="7">
+        </label>
+        <label>
+          <span class="ctl-h">Side</span>
           <span class="toggle"><button data-side="long" class="on">Long</button><button data-side="short">Short</button></span>
         </label>
       </div>
