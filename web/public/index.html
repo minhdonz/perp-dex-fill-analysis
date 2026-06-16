@@ -78,7 +78,7 @@
 
   <section id="method" class="block">
     <h2>Methodology &amp; confidence</h2>
-    <p class="sub">What's measured, how, and where the seams are. We slice the data into 2-hour windows. A window is "clean" if no feed disconnect or data gap was detected during it; windows with a gap are dropped from every number above, so a brief outage is never mistaken for a real reading. The table shows each venue's share of clean windows, i.e. how reliably we captured its data.</p>
+    <p class="sub">What's measured, how, and where the seams are. A single trade usually fills in many small pieces; before measuring its cost we group those pieces back into the one order the trader actually sent. How precisely we can do that depends on what each venue publishes, shown in the table below. We also slice the data into 2-hour windows: a window is "clean" if no feed disconnect or data gap was detected during it, and windows with a gap are dropped from every number above, so a brief outage is never mistaken for a real reading. The last column shows each venue's share of clean windows, i.e. how reliably we captured its data.</p>
     <div class="table-wrap"><table id="cov-table"></table></div>
     <ul id="seams"></ul>
   </section>

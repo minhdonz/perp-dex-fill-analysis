@@ -212,7 +212,11 @@ def main() -> None:
     print("  ~fl / gap feed-limited = Pacifica's book refreshes faster than its snapshot feed,")
     print("                so its advertised/gap is under-measured; realized is still reliable")
     print("  depth-cut   = clips larger than the venue's visible book (excluded, not extrapolated)")
-    print("  conf: exact=Lighter order id · ident=HL taker addr+window · heur=Pacifica sweep")
+    print("  conf = how each venue's many small fills are grouped back into one trader's order:")
+    print("    exact = Lighter publishes the taker order id, so every fill is grouped precisely")
+    print("    ident = HL publishes the taker but not order ids; fills from one taker in a short")
+    print("            window are read as one clip")
+    print("    heur  = Pacifica publishes neither, so a fast same-side run of trades is read as a sweep")
 
 
 if __name__ == "__main__":

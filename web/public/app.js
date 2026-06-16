@@ -193,13 +193,20 @@ function renderStress() {
 }
 
 // ---------- Methodology ----------
+const METHOD_DESC = {
+  exact: ["Exact", "Lighter publishes the taker order ID, so every fill of one order is grouped back together precisely."],
+  identity: ["By taker", "Hyperliquid publishes the taker but not order IDs, so fills from the same taker within a few milliseconds are grouped as one order."],
+  heuristic: ["Inferred", "Pacifica publishes neither order IDs nor the taker, so a fast run of same-side trades is read as one sweep."],
+};
 function renderMethod() {
   const t = $("#cov-table"); t.innerHTML = "";
-  t.appendChild(el("tr", "", "<th>venue</th><th>clip-size method</th><th>data reliability (clean 2h windows)</th>"));
+  t.appendChild(el("tr", "", "<th>venue</th><th>how a trade is reconstructed</th><th>data reliability (clean 2h windows)</th>"));
   D.coverage.venues.forEach((c) => {
     const cell = c.clean_pct == null ? "n/a"
       : `${c.clean_pct}% clean (${Math.round(c.clean_pct / 100 * c.windows)} of ${c.windows})`;
-    t.appendChild(el("tr", "", `<td>${VLABEL[c.venue]}</td><td>${c.method}</td><td>${cell}</td>`));
+    const [name, gloss] = METHOD_DESC[c.method] || [c.method, ""];
+    const mcell = `<strong>${name}</strong>${gloss ? `<br><span class="muted mgloss">${gloss}</span>` : ""}`;
+    t.appendChild(el("tr", "", `<td>${VLABEL[c.venue]}</td><td>${mcell}</td><td>${cell}</td>`));
   });
   const ul = $("#seams"); ul.innerHTML = "";
   D.coverage.seams.forEach((s) => ul.appendChild(el("li", "", s)));

@@ -20,8 +20,11 @@ from analysis.netcost import net_cost
 from analysis.reconstruct import METHOD, NEG_REALIZED_LIMIT, RUNGS, touch_floor_bps
 
 VENUES = ["hyperliquid", "lighter", "pacifica"]
-CONF_LABEL = {"exact": "exact (order id)", "identity": "identity (taker+window)",
-              "heuristic": "heuristic (sweep)"}
+CONF_LABEL = {
+    "exact": "exact: every fill tied to its taker order ID",
+    "identity": "by taker: fills from one taker within ms (no order IDs published)",
+    "heuristic": "inferred: a fast same-side run read as one sweep (no IDs or taker)",
+}
 
 
 def rung_label(r):
@@ -232,8 +235,11 @@ def section_stress(conn, assets, since_ns, threshold, bucket_min, merge_gap_min,
 
 def section_methodology(conn):
     out = ["\n## 4. Methodology & Confidence\n",
+           "A single trade usually fills in many pieces; before measuring its cost we group "
+           "those pieces back into the one order the trader sent. How precisely we can do that "
+           "depends on what each venue publishes (the *how a trade is reconstructed* column).\n",
            "**Coverage (clean 2h windows, excluded if a feed gap was detected):**\n",
-           "| venue | method | clean windows |", "|---|---|---|"]
+           "| venue | how a trade is reconstructed | clean windows |", "|---|---|---|"]
     for v in VENUES:
         total, gapped = conn.execute(
             "SELECT COUNT(*), COALESCE(SUM(has_gap),0) FROM window_summaries WHERE venue=?",
