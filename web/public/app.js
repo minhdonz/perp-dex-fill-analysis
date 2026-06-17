@@ -68,9 +68,16 @@ function renderGapTabs() {
   });
 }
 function cheapestVenue(cells) {
-  let best = null;
-  for (const v of VENUES) { const c = cells[v]; if (c && !c.sparse && !c.bad_realized && (best === null || c.realized < best[1])) best = [v, c.realized]; }
-  return best ? best[0] : null;
+  let best = null, minAll = Infinity;
+  for (const v of VENUES) {
+    const c = cells[v]; if (!c || c.bad_realized) continue;
+    if (c.realized < minAll) minAll = c.realized;            // cheapest present, incl. sparse
+    if (!c.sparse && (best === null || c.realized < best[1])) best = [v, c.realized];
+  }
+  // don't crown a winner if a thinner (sparse) cell is actually cheaper — that would
+  // bold a pricier venue just because the cheaper one is under-sampled.
+  if (!best || minAll < best[1] - 1e-9) return null;
+  return best[0];
 }
 function renderGapTable() {
   const t = $("#gap-table"); t.innerHTML = "";

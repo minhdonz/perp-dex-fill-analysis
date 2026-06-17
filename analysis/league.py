@@ -151,6 +151,12 @@ def main() -> None:
             leader = rankable[0] if rankable else None
             tie = (leader is not None and len(rankable) > 1
                    and rankable[1]["real"] - leader["real"] < TIE_EPS)
+            # don't crown a leader if a thinner (sparse) cell is actually cheaper —
+            # that would mark a pricier venue as best just because the cheaper one
+            # is under-sampled. Wait for the cheaper cell to clear the threshold.
+            present = [c["real"] for c in cells if not c["bad_realized"]]
+            if leader is not None and present and min(present) < leader["real"] - 1e-9:
+                leader, tie = None, False
 
             label = rung_label(rung)
             for c in display_order(cells):
