@@ -41,10 +41,11 @@ const D = {};  // loaded JSON
 const $ = (s) => document.querySelector(s);
 const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c; if (h != null) e.innerHTML = h; return e; };
 const fmtUsd = (v) => v >= 1e9 ? `$${(v/1e9).toFixed(v%1e9?1:0)}B` : v >= 1e6 ? `$${(v/1e6).toFixed(0)}M` : v >= 1e3 ? `$${(v/1e3).toFixed(0)}k` : `$${v}`;
+const fmtSigned = (v) => { const s = v < 0 ? "−" : "+", a = Math.abs(v); return s + (a >= 1e6 ? `$${(a/1e6).toFixed(1)}M` : a >= 1e3 ? `$${(a/1e3).toFixed(0)}k` : `$${a.toFixed(0)}`); };
 const rungLabel = (r) => r < 1e6 ? `$${r/1e3}k` : `$${r/1e6}M`;
 
 async function load() {
-  const names = ["meta", "gap", "calc", "history", "stress", "coverage", "funding"];
+  const names = ["meta", "gap", "calc", "history", "stress", "coverage", "funding", "makers"];
   const res = await Promise.all(names.map((n) => fetch(`data/${n}.json`).then((r) => r.json())));
   names.forEach((n, i) => (D[n] = res[i]));
 }
@@ -307,6 +308,84 @@ function renderMethod() {
   D.coverage.seams.forEach((s) => ul.appendChild(el("li", "", s)));
 }
 
+// ---------- Maker analysis ----------
+let makerChart, makersRendered = false;
+function renderMakerChart(d) {
+  const top = d.makers.slice(0, 12);
+  if (makerChart) makerChart.destroy();
+  makerChart = new Chart($("#mk-chart"), {
+    type: "bar",
+    data: { labels: top.map((m) => m.short), datasets: [{
+      label: "maker volume", backgroundColor: "#5fb3b3", borderRadius: 3,
+      maxBarThickness: 22, data: top.map((m) => m.maker_ntl) }] },
+    options: { indexAxis: "y", responsive: true,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: (c) => ` ${fmtUsd(c.parsed.x)} maker volume` } } },
+      scales: {
+        x: { title: { display: true, text: `maker volume (${d.days}d)`, color: AXIS },
+             ticks: { color: AXIS, callback: (v) => fmtUsd(v) }, grid: { color: GRID } },
+        y: { ticks: { color: AXIS }, grid: { display: false } } } },
+  });
+}
+function renderMakers() {
+  const d = D.makers; if (!d || !d.makers.length) return;
+  const days = d.days;
+  $("#mk-sub").textContent =
+    `${d.makers.length} makers shown of ${d.makers_seen.toLocaleString()} seen over the last `
+    + `${days} days, gated to maker/taker volume ≥ ${d.min_ratio}. Together the makers we observe `
+    + `ran ${fmtUsd(d.total_maker_ntl)} of maker-side notional on the tracked coins.`;
+  renderMakerChart(d);
+  const tips = {
+    vol: `Maker-side notional filled over the last ${days} days on the 5 coins we stream; share is of all observed maker notional.`,
+    markets: "Distinct markets the maker currently holds a position in (true breadth; the trade tape only sees 5 coins).",
+    oi: "Open interest now: the sum of the maker's absolute position notional across all markets.",
+    funding: "Net funding over the window: negative = paid out, positive = received.",
+    pnl: "Most recent full day's profit or loss, from the public portfolio endpoint.",
+    rate: "The maker's actual fee rate. Negative = a rebate (Hyperliquid pays them to provide liquidity).",
+    rebate: "Estimated maker rebate earned over the window: maker volume × rebate rate.",
+  };
+  const t = $("#mk-table"); t.innerHTML = "";
+  t.appendChild(el("tr", "",
+    `<th>#</th><th>maker</th><th data-tip="${tips.vol}">maker vol (${days}d)</th>`
+    + `<th data-tip="${tips.markets}">markets</th><th data-tip="${tips.oi}">OI</th>`
+    + `<th>acct value</th><th data-tip="${tips.funding}">funding (${days}d)</th>`
+    + `<th data-tip="${tips.pnl}">last-day PnL</th><th data-tip="${tips.rate}">maker rate</th>`
+    + `<th data-tip="${tips.rebate}">rebate (${days}d)</th>`));
+  for (const m of d.makers) {
+    const link = `https://app.hyperliquid.xyz/explorer/address/${m.address}`;
+    const share = `<span class="muted">${(m.maker_share * 100).toFixed(1)}%</span>`;
+    const sgn = (v) => v == null ? "-" : `<span class="${v >= 0 ? "up" : "down"}">${fmtSigned(v)}</span>`;
+    const rate = m.maker_bps == null ? "-"
+      : `${m.maker_bps > 0 ? "+" : ""}${m.maker_bps.toFixed(2)} bps${m.maker_bps < 0 ? ' <span class="muted">rebate</span>' : ""}`;
+    t.appendChild(el("tr", "",
+      `<td>${m.rank}</td>`
+      + `<td><a href="${link}" target="_blank" rel="noopener">${m.short}</a></td>`
+      + `<td>${fmtUsd(m.maker_ntl)} ${share}</td>`
+      + `<td>${m.markets ?? "-"}</td>`
+      + `<td>${m.oi == null ? "-" : fmtUsd(m.oi)}</td>`
+      + `<td>${m.account_value == null ? "-" : fmtUsd(m.account_value)}</td>`
+      + `<td>${sgn(m.funding_net)}</td>`
+      + `<td>${sgn(m.last_day_pnl)}</td>`
+      + `<td>${rate}</td>`
+      + `<td>${m.rebate_window == null ? "-" : fmtUsd(m.rebate_window)}</td>`));
+  }
+  const asOf = d.as_of
+    ? new Date(d.as_of * 1000).toISOString().slice(0, 16).replace("T", " ") + " UTC" : null;
+  $("#mk-note").textContent =
+    `Volume and share come from the trade tape (5 coins); OI, account value, funding, PnL, and `
+    + `fees are polled from Hyperliquid's public per-address endpoints${asOf ? `, as of ${asOf}` : ""}. `
+    + `Addresses link to the Hyperliquid explorer.`;
+}
+function setMode(maker) {
+  $("#view-taker").hidden = maker;
+  $("#view-maker").hidden = !maker;
+  $("#taker-nav").style.display = maker ? "none" : "";
+  $("#mode-taker").classList.toggle("on", !maker);
+  $("#mode-maker").classList.toggle("on", maker);
+  if (maker && !makersRendered) { renderMakers(); makersRendered = true; }
+  window.scrollTo(0, 0);
+}
+
 // ---------- tooltips (custom; native title is slow and clipped by overflow) ----------
 function initTooltips() {
   const tip = el("div"); tip.id = "tip"; document.body.appendChild(tip);
@@ -358,6 +437,13 @@ function init() {
   renderTrack();
 
   renderStress(); renderMethod();
+
+  if (D.meta.has_makers && D.makers && D.makers.makers.length) {
+    $("#mode-taker").onclick = () => setMode(false);
+    $("#mode-maker").onclick = () => setMode(true);
+  } else {
+    $("#mode-maker").hidden = true;
+  }
 }
 
 load().then(init).catch((e) => { $("#headline").textContent = "Failed to load data."; console.error(e); });
