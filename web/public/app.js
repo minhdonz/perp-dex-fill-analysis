@@ -194,7 +194,8 @@ function renderFundTable() {
   const t = $("#fund-table"); t.innerHTML = "";
   const consistencyTip = "Share of hours in the window where funding was positive (longs paying). Near 100% or 0% means consistently one direction; near 50% means it keeps switching.";
   const stabilityTip = "Flip rate: share of consecutive hours where the funding rate changed sign. Lower is a more dependable carry; higher means the rate keeps flipping.";
-  t.appendChild(el("tr", "", `<th>venue</th><th>funding APR</th><th>direction</th><th data-tip="${consistencyTip}">consistency</th><th data-tip="${stabilityTip}">stability (flip rate)</th><th>volatility</th><th>hrs</th>`));
+  const volatilityTip = "Standard deviation of the venue's hourly funding rate over the window, in basis points per hour. Higher means the rate swings more from hour to hour, even if its average is steady.";
+  t.appendChild(el("tr", "", `<th>venue</th><th>funding APR</th><th>direction</th><th data-tip="${consistencyTip}">consistency</th><th data-tip="${stabilityTip}">stability (flip rate)</th><th data-tip="${volatilityTip}">volatility</th><th>hrs</th>`));
   const cells = D.funding.assets[fundAsset] || {};
   for (const v of VENUES) {
     const c = cells[v];
