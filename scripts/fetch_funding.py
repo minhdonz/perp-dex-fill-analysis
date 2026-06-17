@@ -26,6 +26,9 @@ PACIFICA_HIST = "https://api.pacifica.fi/api/v1/funding_rate/history"
 LIGHTER_ORDERBOOKS = "https://mainnet.zklighter.elliot.ai/api/v1/orderBooks"
 LIGHTER_FUNDINGS = "https://mainnet.zklighter.elliot.ai/api/v1/fundings"
 ASSETS = ["BTC", "ETH", "SOL", "HYPE", "ZEC", "SPCX"]
+# HL builder (HIP-3) perps are namespaced on the funding endpoint; store under the
+# normalized coin so it joins the rest of the pipeline.
+HL_FUNDING_COIN = {"SPCX": "xyz:SPCX"}
 WINDOW_NS = 2 * 3600 * 1_000_000_000  # 2h funding-window bucket
 
 
@@ -124,7 +127,8 @@ def main() -> None:
         for venue in args.venues:
             try:
                 if venue == "hyperliquid":
-                    store(conn, venue, coin, hl_hourly(coin, start_ms), args.days)
+                    store(conn, venue, coin,
+                          hl_hourly(HL_FUNDING_COIN.get(coin, coin), start_ms), args.days)
                 elif venue == "pacifica":
                     store(conn, venue, coin, pacifica_hourly(coin, count_back), args.days)
                 elif venue == "lighter":

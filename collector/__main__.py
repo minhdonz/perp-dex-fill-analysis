@@ -24,7 +24,7 @@ DEFAULT_COINS = ["BTC", "ETH", "SOL", "HYPE", "ZEC"]
 # Per-venue extra markets not listed on every venue. SpaceX (SPCX) is a HIP-3
 # builder perp on HL (namespaced "xyz:SPCX", normalized to "SPCX" by the HL
 # collector) and a native market on Lighter; Pacifica doesn't list it.
-EXTRA_COINS = {"hyperliquid": ["xyz:SPCX"], "lighter": ["SPCX"]}
+EXTRA_COINS = {"hyperliquid": ["xyz:SPCX"], "lighter": ["SPCX"], "pacifica": ["SPCX"]}
 STATUS_INTERVAL_S = 60
 
 
