@@ -331,12 +331,12 @@ function renderMakers() {
   const d = D.makers; if (!d || !d.makers.length) return;
   const days = d.days;
   $("#mk-sub").textContent =
-    `${d.makers.length} makers shown of ${d.makers_seen.toLocaleString()} seen over the last `
-    + `${days} days, gated to maker/taker volume ≥ ${d.min_ratio}. Together the makers we observe `
-    + `ran ${fmtUsd(d.total_maker_ntl)} of maker-side notional on the tracked coins.`;
+    `${d.makers.length} makers shown of ${d.makers_seen.toLocaleString()} seen on the coins we stream, `
+    + `gated to maker/taker volume ≥ ${d.min_ratio}. Volume is each maker's ${days}-day maker-side `
+    + `volume across all Hyperliquid markets; together the makers shown ran ${fmtUsd(d.total_maker_ntl)}.`;
   renderMakerChart(d);
   const tips = {
-    vol: `Maker-side notional filled over the last ${days} days on the 5 coins we stream; share is of all observed maker notional.`,
+    vol: `Maker-side volume over the last ${days} days across all Hyperliquid markets, from the venue's per-account data. Share is of the makers shown here.`,
     markets: "Distinct markets the maker currently holds a position in (true breadth; the trade tape only sees 5 coins).",
     oi: "Open interest now: the sum of the maker's absolute position notional across all markets.",
     funding: "Net funding over the window: negative = paid out, positive = received.",
@@ -354,13 +354,14 @@ function renderMakers() {
   for (const m of d.makers) {
     const link = `https://app.hyperliquid.xyz/explorer/address/${m.address}`;
     const share = `<span class="muted">${(m.maker_share * 100).toFixed(1)}%</span>`;
+    const volMark = m.all_markets === false ? '<sup title="tracked-coin volume only; account not yet polled">~</sup>' : "";
     const sgn = (v) => v == null ? "-" : `<span class="${v >= 0 ? "up" : "down"}">${fmtSigned(v)}</span>`;
     const rate = m.maker_bps == null ? "-"
       : `${m.maker_bps > 0 ? "+" : ""}${m.maker_bps.toFixed(2)} bps${m.maker_bps < 0 ? ' <span class="muted">rebate</span>' : ""}`;
     t.appendChild(el("tr", "",
       `<td>${m.rank}</td>`
       + `<td><a href="${link}" target="_blank" rel="noopener">${m.short}</a></td>`
-      + `<td>${fmtUsd(m.maker_ntl)} ${share}</td>`
+      + `<td>${fmtUsd(m.maker_ntl)}${volMark} ${share}</td>`
       + `<td>${m.markets ?? "-"}</td>`
       + `<td>${m.oi == null ? "-" : fmtUsd(m.oi)}</td>`
       + `<td>${m.account_value == null ? "-" : fmtUsd(m.account_value)}</td>`

@@ -44,7 +44,7 @@ def info(payload: dict, retries: int = 3):
             time.sleep(1.5 * (attempt + 1))
 
 
-def store_state(conn, addr, start_ms, days, now_ns):
+def store_state(conn, addr, start_ms, days, now_ns, maker_vol=None, taker_vol=None):
     chs = info({"type": "clearinghouseState", "user": addr})
     if not isinstance(chs, dict) or "assetPositions" not in chs:
         return False
@@ -71,9 +71,11 @@ def store_state(conn, addr, start_ms, days, now_ns):
         conn.execute(
             "INSERT OR REPLACE INTO account_state (venue, address, ts_ns, account_value, "
             "open_interest, n_positions, unrealized_pnl, total_ntl_pos, funding_net, "
-            "funding_days, positions) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            "funding_days, maker_vol_14d, taker_vol_14d, positions) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (makers.VENUE, addr, now_ns, float(ms.get("accountValue", 0)), oi, len(aps),
-             upnl, float(ms.get("totalNtlPos", 0)), funding_net, days, zjson(positions)))
+             upnl, float(ms.get("totalNtlPos", 0)), funding_net, days, maker_vol, taker_vol,
+             zjson(positions)))
     return True
 
 
@@ -105,18 +107,22 @@ def store_pnl(conn, addr):
 
 
 def store_fees(conn, addr, now_ns):
+    """Returns (maker_vol_14d, taker_vol_14d) across ALL markets, from the venue's
+    own per-account daily volume (the trade tape only sees our streamed coins)."""
     fees = info({"type": "userFees", "user": addr})
     if not isinstance(fees, dict) or "userCrossRate" not in fees:
-        return
+        return None, None
     taker = float(fees["userCrossRate"]) * 1e4
     maker = float(fees.get("userAddRate", 0)) * 1e4   # negative = rebate
-    rows = fees.get("dailyUserVlm") or []
-    vol14 = sum(float(r.get("userCross", 0)) + float(r.get("userAdd", 0)) for r in rows[-14:])
+    rows = (fees.get("dailyUserVlm") or [])[-14:]
+    maker_vol = sum(float(r.get("userAdd", 0)) for r in rows)
+    taker_vol = sum(float(r.get("userCross", 0)) for r in rows)
     with conn:
         conn.execute(
             "INSERT OR REPLACE INTO account_fees (venue, account, taker_bps, maker_bps, "
             "vol_14d_usd, fetched_ns) VALUES ('hyperliquid',?,?,?,?,?)",
-            (addr, taker, maker, vol14, now_ns))
+            (addr, taker, maker, maker_vol + taker_vol, now_ns))
+    return maker_vol, taker_vol
 
 
 def main() -> None:
@@ -147,12 +153,13 @@ def main() -> None:
     ok = 0
     for r in ranked:
         addr = r["address"]
-        got = store_state(conn, addr, start_ms, args.days, now_ns)
+        mkr_vol, tkr_vol = store_fees(conn, addr, now_ns)   # all-market 14d volume
+        got = store_state(conn, addr, start_ms, args.days, now_ns, mkr_vol, tkr_vol)
         npnl = store_pnl(conn, addr)
-        store_fees(conn, addr, now_ns)
         ok += int(got)
         a = f"{addr[:6]}…{addr[-4:]}"
-        print(f"  {a}  state={'ok' if got else 'MISS'}  pnl_days={npnl}")
+        mv = f"${mkr_vol/1e6:,.0f}M" if mkr_vol else "-"
+        print(f"  {a}  state={'ok' if got else 'MISS'}  pnl_days={npnl}  maker14d={mv}")
         time.sleep(args.sleep)
     print(f"\nfetched {ok}/{len(ranked)} accounts")
 

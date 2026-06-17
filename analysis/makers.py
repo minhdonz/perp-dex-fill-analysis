@@ -82,6 +82,11 @@ CREATE TABLE IF NOT EXISTS account_pnl (
 
 def ensure_schema(conn) -> None:
     conn.executescript(SCHEMA)
+    # all-market 14d maker/taker volume from userFees (added after first deploy)
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(account_state)")}
+    for c in ("maker_vol_14d", "taker_vol_14d"):
+        if c not in cols:
+            conn.execute(f"ALTER TABLE account_state ADD COLUMN {c} REAL")
 
 
 # ---------- maker-volume rollup (from stored raw) ----------
@@ -162,12 +167,13 @@ def rank(conn, days=5.0, min_ratio=0.0, limit=50):
 def _latest_state(conn, addr):
     r = conn.execute(
         "SELECT account_value, open_interest, n_positions, unrealized_pnl, total_ntl_pos, "
-        "funding_net, funding_days, ts_ns FROM account_state WHERE venue=? AND address=? "
-        "ORDER BY ts_ns DESC LIMIT 1", (VENUE, addr)).fetchone()
+        "funding_net, funding_days, maker_vol_14d, taker_vol_14d, ts_ns FROM account_state "
+        "WHERE venue=? AND address=? ORDER BY ts_ns DESC LIMIT 1", (VENUE, addr)).fetchone()
     if not r:
         return None
     keys = ["account_value", "open_interest", "n_positions", "unrealized_pnl",
-            "total_ntl_pos", "funding_net", "funding_days", "ts_ns"]
+            "total_ntl_pos", "funding_net", "funding_days", "maker_vol_14d",
+            "taker_vol_14d", "ts_ns"]
     return dict(zip(keys, r))
 
 

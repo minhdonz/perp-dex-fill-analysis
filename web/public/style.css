@@ -168,6 +168,9 @@ h3{font-size:13px;color:var(--muted);margin:28px 0 4px;font-weight:500}
 
 footer{max-width:1140px;margin:0 auto;padding:34px 24px 64px;color:var(--faint);font-size:12px;
   border-top:1px solid var(--line);font-family:var(--mono)}
+footer p{margin:4px 0}
+footer a{color:var(--accent)}
+footer a:hover{text-decoration:underline}
 
 @media(max-width:760px){
   .nav{gap:14px;padding:0 16px}

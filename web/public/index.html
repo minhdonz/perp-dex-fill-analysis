@@ -147,7 +147,7 @@
     <p class="lede">Hyperliquid is transparent. The honest limits.</p>
     <ul id="mk-seams">
       <li><strong>Hyperliquid only.</strong> It's an on-chain L1, so per-address positions, OI, PnL, and fees are public. Lighter exposes maker identity and volume but no economics; Pacifica exposes neither, so neither is shown here.</li>
-      <li><strong>Maker volume is measured on the 5 coins we stream</strong> (BTC, ETH, SOL, HYPE, ZEC), recovered from each trade's counterparty. A maker's real cross-market volume is larger; <em>markets</em> below uses live position count for true breadth.</li>
+      <li><strong>Makers are identified from the 5 coins we stream</strong> (BTC, ETH, SOL, HYPE, ZEC), recovered from each trade's counterparty. The volume, OI, PnL, funding, and fees shown are each maker's full <em>cross-market</em> figures from Hyperliquid's public per-account data, not just those 5 coins.</li>
       <li><strong>"Markets" = distinct markets the maker currently holds a position in.</strong> Resting quotes aren't public on any venue, so we can't show live order placement, only where a maker actually trades and carries risk.</li>
       <li><strong>Makers are gated by a maker/taker volume ratio</strong> so directional takers crossing the book aren't mislabeled as market makers.</li>
       <li><strong>Addresses are public on Hyperliquid.</strong> We rank and link them; we don't deanonymize.</li>
@@ -158,6 +158,7 @@
 
 <footer>
   <p>RealizedFill · read-only perp DEX execution-quality measurement · data refreshes periodically.</p>
+  <p>Built by Minh · <a href="https://x.com/0xMinhdonz" target="_blank" rel="noopener">@0xMinhdonz</a> · questions and feedback welcome.</p>
 </footer>
 
 <script src="app.js"></script>

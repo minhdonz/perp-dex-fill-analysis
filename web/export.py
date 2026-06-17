@@ -193,12 +193,23 @@ def main() -> None:
         "SELECT COUNT(DISTINCT maker) FROM maker_windows WHERE venue='hyperliquid' "
         "AND window_start_ns>=?", (int((time.time() - args.maker_days * 86400) * 1e9),)
     ).fetchone()[0]
-    def maker_json(m):
+    # Display volume = all-market 14d maker volume from userFees (the tape only sees our
+    # streamed coins); fall back to the tape figure if the account wasn't polled yet.
+    def disp_vol(m):
+        s = m["state"] or {}
+        return (s.get("maker_vol_14d"), True) if s.get("maker_vol_14d") else (m["maker_ntl"], False)
+    enriched = [(m, *disp_vol(m)) for m in ml["makers"]]
+    enriched.sort(key=lambda t: t[1], reverse=True)           # order by displayed (true) volume
+    tot_disp = sum(v for _, v, _ in enriched) or 1.0
+    def maker_json(rank, m, vol, all_markets):
         s, f = m["state"] or {}, m["fees"] or {}
+        mbps = (f or {}).get("maker_bps")
+        rebate = vol * (-mbps) / 1e4 if mbps is not None and mbps < 0 else None
         return {
-            "rank": m["rank"], "address": m["address"],
+            "rank": rank, "address": m["address"],
             "short": f"{m['address'][:6]}…{m['address'][-4:]}",
-            "maker_ntl": round(m["maker_ntl"]), "maker_share": round(m["maker_share"], 4),
+            "maker_ntl": round(vol), "maker_share": round(vol / tot_disp, 4),
+            "all_markets": all_markets, "tape_ntl": round(m["maker_ntl"]),
             "ratio": None if m["ratio"] == float("inf") else round(m["ratio"], 1),
             "markets": (s or {}).get("n_positions"),         # true breadth (positions held)
             "tape_coins": m["tape_coins"],
@@ -209,14 +220,14 @@ def main() -> None:
             "last_day_pnl": round(m["pnl"][-1]["pnl"]) if m["pnl"] else None,
             "pnl": [{"day": p["day"], "pnl": round(p["pnl"])} for p in m["pnl"]],
             "taker_bps": (f or {}).get("taker_bps"),
-            "maker_bps": (f or {}).get("maker_bps"),
-            "rebate_window": round(m["rebate_earned_window"]) if m["rebate_earned_window"] else None,
+            "maker_bps": mbps,
+            "rebate_window": round(rebate) if rebate else None,
         }
     dump("makers.json", {
         "days": ml["days"], "min_ratio": ml["min_ratio"],
-        "total_maker_ntl": round(ml["total_maker_ntl"]),
+        "total_maker_ntl": round(tot_disp),
         "makers_seen": n_seen, "as_of": int(as_of / 1e9) if as_of else None,
-        "makers": [maker_json(m) for m in ml["makers"]],
+        "makers": [maker_json(i, m, v, am) for i, (m, v, am) in enumerate(enriched, 1)],
     })
 
     # ---- meta.json ----
