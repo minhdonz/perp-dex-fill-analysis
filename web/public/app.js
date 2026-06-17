@@ -93,7 +93,7 @@ function renderGapTable() {
       if (!c) { tr.appendChild(el("td", "muted", "–")); continue; }
       if (c.bad_realized) { const td = el("td", "muted", "n/a"); td.setAttribute("data-tip", `thin or stale cell: realized non-physical, suppressed${c.n != null ? ` (n=${c.n})` : ""}`); tr.appendChild(td); continue; }
       const g = c.feed_limited ? `<span class="badge">fl</span>` : Math.max(c.gap, 0).toFixed(2);
-      const star = c.sparse ? "<sup>*</sup>" : "";
+      const star = c.sparse ? `<sup class="spk" data-tip="Sparse: only ${c.n} clip${c.n === 1 ? "" : "s"} of this size in the window (under 5). Shown for transparency, not ranked or crowned cheapest yet.">*</sup>` : "";
       const td = el("td", v === best ? "best" : "", `${c.realized.toFixed(2)} <span class="g">(${g})</span>${star}`);
       if (c.n != null) td.setAttribute("data-tip", `n=${c.n} clips`);
       tr.appendChild(td);
