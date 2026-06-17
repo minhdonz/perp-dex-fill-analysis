@@ -377,13 +377,21 @@ function renderMakers() {
     + `fees are polled from Hyperliquid's public per-address endpoints${asOf ? `, as of ${asOf}` : ""}. `
     + `Addresses link to the Hyperliquid explorer.`;
 }
-function setMode(maker) {
+let makerMode = false;
+const hashIsMaker = () => location.hash.replace("#", "") === "maker";
+function syncHash(maker) {
+  history.pushState(null, "", maker ? "#maker" : location.pathname + location.search);
+}
+function setMode(maker, push) {
+  if (maker === makerMode) { if (push) syncHash(maker); return; }  // no view change
+  makerMode = maker;
   $("#view-taker").hidden = maker;
   $("#view-maker").hidden = !maker;
   $("#taker-nav").style.display = maker ? "none" : "";
   $("#mode-taker").classList.toggle("on", !maker);
   $("#mode-maker").classList.toggle("on", maker);
   if (maker && !makersRendered) { renderMakers(); makersRendered = true; }
+  if (push) syncHash(maker);
   window.scrollTo(0, 0);
 }
 
@@ -440,8 +448,11 @@ function init() {
   renderStress(); renderMethod();
 
   if (D.meta.has_makers && D.makers && D.makers.makers.length) {
-    $("#mode-taker").onclick = () => setMode(false);
-    $("#mode-maker").onclick = () => setMode(true);
+    $("#mode-taker").onclick = () => setMode(false, true);
+    $("#mode-maker").onclick = () => setMode(true, true);
+    addEventListener("hashchange", () => setMode(hashIsMaker(), false));
+    addEventListener("popstate", () => setMode(hashIsMaker(), false));
+    if (hashIsMaker()) setMode(true, false);   // deep-link: /#maker opens the maker view
   } else {
     $("#mode-maker").hidden = true;
   }
