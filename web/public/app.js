@@ -192,7 +192,9 @@ function stabBand(flip) {
 }
 function renderFundTable() {
   const t = $("#fund-table"); t.innerHTML = "";
-  t.appendChild(el("tr", "", "<th>venue</th><th>funding APR</th><th>direction</th><th>consistency</th><th>stability (flip rate)</th><th>volatility</th><th>hrs</th>"));
+  const consistencyTip = "Share of hours in the window where funding was positive (longs paying). Near 100% or 0% means consistently one direction; near 50% means it keeps switching.";
+  const stabilityTip = "Flip rate: share of consecutive hours where the funding rate changed sign. Lower is a more dependable carry; higher means the rate keeps flipping.";
+  t.appendChild(el("tr", "", `<th>venue</th><th>funding APR</th><th>direction</th><th title="${consistencyTip}">consistency</th><th title="${stabilityTip}">stability (flip rate)</th><th>volatility</th><th>hrs</th>`));
   const cells = D.funding.assets[fundAsset] || {};
   for (const v of VENUES) {
     const c = cells[v];
@@ -200,8 +202,8 @@ function renderFundTable() {
     const apr = c.apr * 100;
     const dir = c.apr >= 0 ? `<span class="chip chip-long">longs pay</span>` : `<span class="chip chip-short">shorts pay</span>`;
     const pos = c.pct_positive == null ? "–" : `${Math.round(c.pct_positive * 100)}% of hrs +`;
-    const [word, cls] = stabBand(c.flip_rate);
-    const flip = c.flip_rate == null ? "–" : `<span class="stab ${cls}"></span>${Math.round(c.flip_rate * 100)}% <span class="muted">${word}</span>`;
+    const [word] = stabBand(c.flip_rate);
+    const flip = c.flip_rate == null ? "–" : `${(c.flip_rate * 100).toFixed(2)}% <span class="muted">${word}</span>`;
     const vol = c.std_hourly == null ? "–" : `${(c.std_hourly * 1e4).toFixed(2)} bps/hr`;
     t.appendChild(el("tr", "",
       `<td>${VLABEL[v]}</td><td>${apr >= 0 ? "+" : ""}${apr.toFixed(1)}%</td><td>${dir}</td><td>${pos}</td><td>${flip}</td><td>${vol}</td><td>${c.n ?? "–"}</td>`));

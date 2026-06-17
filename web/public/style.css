@@ -56,8 +56,7 @@ main{max-width:1140px;margin:0 auto;padding:0 24px}
 .chip{display:inline-block;border-radius:4px;padding:1px 7px;font:500 11px var(--mono);white-space:nowrap}
 .chip-long{background:rgba(224,121,95,.14);color:var(--pos)}
 .chip-short{background:rgba(111,174,142,.14);color:var(--neg)}
-.stab{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
-.s-ok{background:var(--neg)}.s-mid{background:var(--accent)}.s-bad{background:var(--pos)}
+th[title]{cursor:help;text-decoration:underline dotted var(--line2);text-underline-offset:3px}
 
 /* ---- tabs / toggles ---- */
 .tabs{display:inline-flex;gap:2px;flex-wrap:wrap;margin-bottom:18px;background:var(--panel);
