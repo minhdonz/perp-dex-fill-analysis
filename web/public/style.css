@@ -56,7 +56,12 @@ main{max-width:1140px;margin:0 auto;padding:0 24px}
 .chip{display:inline-block;border-radius:4px;padding:1px 7px;font:500 11px var(--mono);white-space:nowrap}
 .chip-long{background:rgba(224,121,95,.14);color:var(--pos)}
 .chip-short{background:rgba(111,174,142,.14);color:var(--neg)}
-th[title]{cursor:help;text-decoration:underline dotted var(--line2);text-underline-offset:3px}
+th[data-tip]{cursor:help;text-decoration:underline dotted var(--line2);text-underline-offset:3px}
+#tip{position:fixed;z-index:60;max-width:300px;background:#15171a;border:1px solid var(--line2);
+  color:#cdd0d5;font:12px/1.5 var(--sans);padding:9px 11px;border-radius:8px;pointer-events:none;
+  box-shadow:0 8px 28px rgba(0,0,0,.45);opacity:0;transform:translateY(4px);
+  transition:opacity .1s,transform .1s;display:none;text-transform:none;letter-spacing:0}
+#tip.show{opacity:1;transform:none}
 
 /* ---- tabs / toggles ---- */
 .tabs{display:inline-flex;gap:2px;flex-wrap:wrap;margin-bottom:18px;background:var(--panel);

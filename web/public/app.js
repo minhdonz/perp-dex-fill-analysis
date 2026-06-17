@@ -194,7 +194,7 @@ function renderFundTable() {
   const t = $("#fund-table"); t.innerHTML = "";
   const consistencyTip = "Share of hours in the window where funding was positive (longs paying). Near 100% or 0% means consistently one direction; near 50% means it keeps switching.";
   const stabilityTip = "Flip rate: share of consecutive hours where the funding rate changed sign. Lower is a more dependable carry; higher means the rate keeps flipping.";
-  t.appendChild(el("tr", "", `<th>venue</th><th>funding APR</th><th>direction</th><th title="${consistencyTip}">consistency</th><th title="${stabilityTip}">stability (flip rate)</th><th>volatility</th><th>hrs</th>`));
+  t.appendChild(el("tr", "", `<th>venue</th><th>funding APR</th><th>direction</th><th data-tip="${consistencyTip}">consistency</th><th data-tip="${stabilityTip}">stability (flip rate)</th><th>volatility</th><th>hrs</th>`));
   const cells = D.funding.assets[fundAsset] || {};
   for (const v of VENUES) {
     const c = cells[v];
@@ -306,12 +306,33 @@ function renderMethod() {
   D.coverage.seams.forEach((s) => ul.appendChild(el("li", "", s)));
 }
 
+// ---------- tooltips (custom; native title is slow and clipped by overflow) ----------
+function initTooltips() {
+  const tip = el("div"); tip.id = "tip"; document.body.appendChild(tip);
+  const place = (target) => {
+    const r = target.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+    let left = Math.max(8, Math.min(r.left + r.width / 2 - tw / 2, innerWidth - tw - 8));
+    let top = r.top - th - 8;
+    if (top < 8) top = r.bottom + 8;
+    tip.style.left = left + "px"; tip.style.top = top + "px";
+  };
+  document.addEventListener("mouseover", (e) => {
+    const t = e.target.closest("[data-tip]"); if (!t) return;
+    tip.textContent = t.getAttribute("data-tip"); tip.style.display = "block";
+    place(t); requestAnimationFrame(() => { place(t); tip.classList.add("show"); });
+  });
+  document.addEventListener("mouseout", (e) => {
+    if (e.target.closest("[data-tip]")) { tip.classList.remove("show"); tip.style.display = "none"; }
+  });
+}
+
 // ---------- wiring ----------
 function fillSelect(sel, opts, val, labelFn) {
   sel.innerHTML = ""; opts.forEach((o) => { const e = el("option"); e.value = o; e.textContent = labelFn ? labelFn(o) : o; sel.appendChild(e); });
   if (val != null) sel.value = val;
 }
 function init() {
+  initTooltips();
   renderHero();
   renderGapTabs(); renderGapTable(); renderGapChart();
 
