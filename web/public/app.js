@@ -83,11 +83,11 @@ function renderGapTable() {
     for (const v of VENUES) {
       const c = cells[v];
       if (!c) { tr.appendChild(el("td", "muted", "–")); continue; }
-      if (c.bad_realized) { const td = el("td", "muted", "n/a"); td.title = "thin/stale cell — realized non-physical, suppressed"; tr.appendChild(td); continue; }
+      if (c.bad_realized) { const td = el("td", "muted", "n/a"); td.setAttribute("data-tip", `thin or stale cell: realized non-physical, suppressed${c.n != null ? ` (n=${c.n})` : ""}`); tr.appendChild(td); continue; }
       const g = c.feed_limited ? `<span class="badge">fl</span>` : Math.max(c.gap, 0).toFixed(2);
       const star = c.sparse ? "<sup>*</sup>" : "";
       const td = el("td", v === best ? "best" : "", `${c.realized.toFixed(2)} <span class="g">(${g})</span>${star}`);
-      if (c.n != null) td.title = `n=${c.n} clips`;
+      if (c.n != null) td.setAttribute("data-tip", `n=${c.n} clips`);
       tr.appendChild(td);
     }
     t.appendChild(tr);
@@ -258,7 +258,7 @@ function renderHeatmap(vd) {
       const val = m[b];
       const c = el("div", "hm-c", val == null ? "" : val.toFixed(2));
       if (val != null) c.style.background = `rgba(95,179,179,${0.06 + 0.5 * Math.min(1, val / max)})`;
-      c.title = val == null ? "no data" : `${val.toFixed(2)} bps · n=${mn[b]}`;
+      c.setAttribute("data-tip", val == null ? "no data" : `${val.toFixed(2)} bps · n=${mn[b]}`);
       hm.appendChild(c);
     }
   });
@@ -322,7 +322,9 @@ function initTooltips() {
     place(t); requestAnimationFrame(() => { place(t); tip.classList.add("show"); });
   });
   document.addEventListener("mouseout", (e) => {
-    if (e.target.closest("[data-tip]")) { tip.classList.remove("show"); tip.style.display = "none"; }
+    const t = e.target.closest("[data-tip]"); if (!t) return;
+    if (e.relatedTarget && t.contains(e.relatedTarget)) return;  // moving within same cell
+    tip.classList.remove("show"); tip.style.display = "none";
   });
 }
 
