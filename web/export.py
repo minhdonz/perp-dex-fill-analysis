@@ -18,7 +18,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
-from analysis import edition, fees, funding, history, league, stress  # noqa: E402
+from analysis import edition, fees, funding, history, league, makers, stress  # noqa: E402
 from analysis.reconstruct import METHOD, RUNGS  # noqa: E402
 
 VENUES = ["hyperliquid", "lighter", "pacifica"]
@@ -65,12 +65,16 @@ def main() -> None:
     ap.add_argument("--window-ms", type=int, default=150)
     ap.add_argument("--min-samples", type=int, default=5)
     ap.add_argument("--stress-threshold", type=float, default=5e6)
+    ap.add_argument("--maker-days", type=float, default=14.0)
+    ap.add_argument("--maker-min-ratio", type=float, default=3.0)
+    ap.add_argument("--maker-top", type=int, default=20)
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
     conn = sqlite3.connect(args.db)
     fees.ensure_schema(conn)
     funding.ensure_schema(conn)
+    makers.ensure_schema(conn)
     since = int((time.time() - args.hours * 3600) * 1e9)
     hist_since = int((time.time() - args.hist_days * 86400) * 1e9)
 
@@ -181,10 +185,45 @@ def main() -> None:
                     "clean_pct": round(100 * (total - gapped) / total, 1) if total else None})
     dump("coverage.json", {"venues": cov, "seams": SEAMS})
 
+    # ---- makers.json (HL market-maker league; addresses are public on HL) ----
+    ml = makers.league(conn, args.maker_days, args.maker_min_ratio, args.maker_top)
+    as_of = conn.execute(
+        "SELECT MAX(ts_ns) FROM account_state WHERE venue='hyperliquid'").fetchone()[0]
+    n_seen = conn.execute(
+        "SELECT COUNT(DISTINCT maker) FROM maker_windows WHERE venue='hyperliquid' "
+        "AND window_start_ns>=?", (int((time.time() - args.maker_days * 86400) * 1e9),)
+    ).fetchone()[0]
+    def maker_json(m):
+        s, f = m["state"] or {}, m["fees"] or {}
+        return {
+            "rank": m["rank"], "address": m["address"],
+            "short": f"{m['address'][:6]}…{m['address'][-4:]}",
+            "maker_ntl": round(m["maker_ntl"]), "maker_share": round(m["maker_share"], 4),
+            "ratio": None if m["ratio"] == float("inf") else round(m["ratio"], 1),
+            "markets": (s or {}).get("n_positions"),         # true breadth (positions held)
+            "tape_coins": m["tape_coins"],
+            "oi": round(s["open_interest"]) if s else None,
+            "account_value": round(s["account_value"]) if s else None,
+            "funding_net": round(s["funding_net"]) if s and s.get("funding_net") is not None else None,
+            "funding_days": s.get("funding_days") if s else None,
+            "last_day_pnl": round(m["pnl"][-1]["pnl"]) if m["pnl"] else None,
+            "pnl": [{"day": p["day"], "pnl": round(p["pnl"])} for p in m["pnl"]],
+            "taker_bps": (f or {}).get("taker_bps"),
+            "maker_bps": (f or {}).get("maker_bps"),
+            "rebate_window": round(m["rebate_earned_window"]) if m["rebate_earned_window"] else None,
+        }
+    dump("makers.json", {
+        "days": ml["days"], "min_ratio": ml["min_ratio"],
+        "total_maker_ntl": round(ml["total_maker_ntl"]),
+        "makers_seen": n_seen, "as_of": int(as_of / 1e9) if as_of else None,
+        "makers": [maker_json(m) for m in ml["makers"]],
+    })
+
     # ---- meta.json ----
     dump("meta.json", {
         "generated_at": int(time.time()), "hours": args.hours,
         "venues": VENUES, "assets": ASSETS, "headline": build_headline(gap),
+        "has_makers": bool(ml["makers"]),
     })
 
     print(f"exported {len(os.listdir(args.out))} json files to {args.out}")
