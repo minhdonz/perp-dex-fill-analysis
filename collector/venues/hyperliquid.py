@@ -32,6 +32,11 @@ from ..models import BookSnapshot, TradeRecord
 
 log = logging.getLogger("hyperliquid")
 
+# Builder-deployed (HIP-3) perps are namespaced on the feed (e.g. "xyz:SPCX").
+# We subscribe with the namespaced id but store a normalized coin so the analysis
+# layer (which keys on coin==asset) compares it across venues like any other asset.
+COIN_ALIAS = {"xyz:SPCX": "SPCX"}
+
 WS_URL = "wss://api.hyperliquid.xyz/ws"
 PING_INTERVAL_S = 45
 
@@ -71,7 +76,7 @@ class HyperliquidCollector(VenueCollector):
             log.debug("unhandled channel: %s", channel)
 
     def _on_trade(self, t: dict) -> None:
-        coin = t["coin"]
+        coin = COIN_ALIAS.get(t["coin"], t["coin"])
         self.mark(coin, "trades")
         side = "buy" if t["side"] == "B" else "sell"
         users = t.get("users") or [None, None]
@@ -93,7 +98,7 @@ class HyperliquidCollector(VenueCollector):
         ))
 
     def _on_book(self, d: dict) -> None:
-        coin = d["coin"]
+        coin = COIN_ALIAS.get(d["coin"], d["coin"])
         self.mark(coin, "book")
         bids, asks = d["levels"]
         self.store.put_book(BookSnapshot(

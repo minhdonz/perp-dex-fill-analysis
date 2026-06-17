@@ -34,7 +34,7 @@ from analysis.reconstruct import (
 )
 
 ALL_VENUES = ["hyperliquid", "lighter", "pacifica"]
-ALL_ASSETS = ["BTC", "ETH", "SOL", "HYPE", "ZEC"]
+ALL_ASSETS = ["BTC", "ETH", "SOL", "HYPE", "ZEC", "SPCX"]
 CONF_TAG = {"exact": "exact", "identity": "ident", "heuristic": "heur"}
 FLOOR_MULT = 1.5      # cost within this x the touch floor counts as "at the floor"
 EGREGIOUS_NEG = 0.5   # gap below this (bps) is non-physical => artifact

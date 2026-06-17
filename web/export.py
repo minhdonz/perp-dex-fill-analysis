@@ -22,7 +22,7 @@ from analysis import edition, fees, funding, history, league, makers, stress  # 
 from analysis.reconstruct import METHOD, RUNGS  # noqa: E402
 
 VENUES = ["hyperliquid", "lighter", "pacifica"]
-ASSETS = ["BTC", "ETH", "SOL", "HYPE", "ZEC"]
+ASSETS = ["BTC", "ETH", "SOL", "HYPE", "ZEC", "SPCX"]
 SEAMS = [
     "Pacifica's advertised/gap is feed-limited: its sub-10ms book refreshes faster than its "
     "snapshot feed, so we report Pacifica's realized cost, not its book-relative gap.",

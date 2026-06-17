@@ -30,7 +30,7 @@ from analysis.reconstruct import (
 )
 
 ALL_VENUES = ["hyperliquid", "lighter", "pacifica"]
-ALL_ASSETS = ["BTC", "ETH", "SOL", "HYPE", "ZEC"]
+ALL_ASSETS = ["BTC", "ETH", "SOL", "HYPE", "ZEC", "SPCX"]
 CONF_TAG = {"exact": "exact", "identity": "ident", "heuristic": "heur"}
 
 

@@ -26,7 +26,7 @@ from collector.storage import connect
 
 WINDOW_NS = 2 * 3600 * 1_000_000_000
 ALL_VENUES = ["hyperliquid", "lighter", "pacifica"]
-ALL_ASSETS = ["BTC", "ETH", "SOL", "HYPE", "ZEC"]
+ALL_ASSETS = ["BTC", "ETH", "SOL", "HYPE", "ZEC", "SPCX"]
 
 
 def windows_to_do(conn, venue, coin, last_complete_ns, recompute):

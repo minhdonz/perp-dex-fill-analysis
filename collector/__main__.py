@@ -21,6 +21,10 @@ VENUES = {
     "pacifica": PacificaCollector,
 }
 DEFAULT_COINS = ["BTC", "ETH", "SOL", "HYPE", "ZEC"]
+# Per-venue extra markets not listed on every venue. SpaceX (SPCX) is a HIP-3
+# builder perp on HL (namespaced "xyz:SPCX", normalized to "SPCX" by the HL
+# collector) and a native market on Lighter; Pacifica doesn't list it.
+EXTRA_COINS = {"hyperliquid": ["xyz:SPCX"], "lighter": ["SPCX"]}
 STATUS_INTERVAL_S = 60
 
 
@@ -35,7 +39,8 @@ async def status_loop(store: Store) -> None:
 
 async def amain(args: argparse.Namespace) -> None:
     store = Store(args.db)
-    collectors = [VENUES[v](store, list(args.coins)) for v in args.venues]
+    collectors = [VENUES[v](store, list(args.coins) + EXTRA_COINS.get(v, []))
+                  for v in args.venues]
     if not args.no_liq_feed:
         collectors.append(OkxLiqCollector(store))
     tasks = [asyncio.create_task(store.run()), asyncio.create_task(status_loop(store))]

@@ -25,7 +25,7 @@ HL_INFO = "https://api.hyperliquid.xyz/info"
 PACIFICA_HIST = "https://api.pacifica.fi/api/v1/funding_rate/history"
 LIGHTER_ORDERBOOKS = "https://mainnet.zklighter.elliot.ai/api/v1/orderBooks"
 LIGHTER_FUNDINGS = "https://mainnet.zklighter.elliot.ai/api/v1/fundings"
-ASSETS = ["BTC", "ETH", "SOL", "HYPE", "ZEC"]
+ASSETS = ["BTC", "ETH", "SOL", "HYPE", "ZEC", "SPCX"]
 WINDOW_NS = 2 * 3600 * 1_000_000_000  # 2h funding-window bucket
 
 

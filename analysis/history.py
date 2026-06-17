@@ -27,7 +27,7 @@ from analysis.reconstruct import BOOK_RELIABLE
 WINDOW_NS = 2 * 3600 * 1_000_000_000
 DAY_NS = 24 * 3600 * 1_000_000_000
 ALL_VENUES = ["hyperliquid", "lighter", "pacifica"]
-ALL_ASSETS = ["BTC", "ETH", "SOL", "HYPE", "ZEC"]
+ALL_ASSETS = ["BTC", "ETH", "SOL", "HYPE", "ZEC", "SPCX"]
 CONF = {"hyperliquid": "ident", "lighter": "exact", "pacifica": "heur"}
 
 
