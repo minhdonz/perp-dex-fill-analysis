@@ -339,10 +339,10 @@ function renderMakers() {
     vol: `Maker-side volume over the last ${days} days across all Hyperliquid markets, from the venue's per-account data. Share is of the makers shown here.`,
     markets: "Distinct markets the maker currently holds a position in (true breadth; the trade tape only sees 5 coins).",
     oi: "Open interest now: the sum of the maker's absolute position notional across all markets.",
-    funding: "Net funding over the window: negative = paid out, positive = received.",
-    pnl: "Most recent full day's profit or loss, from the public portfolio endpoint.",
+    funding: "Net funding over the window: negative = paid out, positive = received. This is a component already inside PnL, not additive.",
+    pnl: "Most recent full day's profit or loss from Hyperliquid's portfolio endpoint. All-in and marked-to-market: it already includes funding and fees/rebates, and reflects unrealized PnL on open positions, not just closed trades.",
     rate: "The maker's actual fee rate. Negative = a rebate (Hyperliquid pays them to provide liquidity).",
-    rebate: "Estimated maker rebate earned over the window: maker volume × rebate rate.",
+    rebate: "Estimated maker rebate earned over the window (maker volume × rebate rate). An estimate of the rebate slice already inside PnL, not additive.",
   };
   const t = $("#mk-table"); t.innerHTML = "";
   t.appendChild(el("tr", "",
@@ -375,6 +375,8 @@ function renderMakers() {
   $("#mk-note").textContent =
     `Volume and share come from the trade tape (5 coins); OI, account value, funding, PnL, and `
     + `fees are polled from Hyperliquid's public per-address endpoints${asOf ? `, as of ${asOf}` : ""}. `
+    + `PnL is all-in: it already includes funding and fees/rebates and is marked-to-market, so the `
+    + `funding and rebate columns are a breakdown of it, not additions on top. `
     + `Addresses link to the Hyperliquid explorer.`;
 }
 let makerMode = false;
