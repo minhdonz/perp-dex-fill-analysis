@@ -17,7 +17,7 @@ if (window.Chart) {
     padding: 10, cornerRadius: 8, usePointStyle: true, boxPadding: 6,
     callbacks: { label: (c) => {
       const n = c.dataset.n?.[c.dataIndex];
-      return ` ${c.dataset.label}  ${c.parsed.y != null ? c.parsed.y.toFixed(2) + " bps" : "n/a"}${n != null ? `  ·  n=${n}` : ""}`;
+      return ` ${c.dataset.label}  ${c.parsed.y != null ? c.parsed.y.toFixed(3) + " bps" : "n/a"}${n != null ? `  ·  n=${n}` : ""}`;
     } },
   });
   // vertical crosshair guide, drawn only for line charts
@@ -71,11 +71,11 @@ function cheapestVenue(cells) {
   let best = null, minAll = Infinity;
   for (const v of VENUES) {
     const c = cells[v]; if (!c || c.bad_realized) continue;
-    if (c.realized < minAll) minAll = c.realized;            // cheapest present, incl. sparse
-    if (!c.sparse && (best === null || c.realized < best[1])) best = [v, c.realized];
+    if (c.realized < minAll) minAll = c.realized;            // cheapest present, incl. sparse/suspect
+    if (!c.sparse && !c.suspect && (best === null || c.realized < best[1])) best = [v, c.realized];
   }
-  // don't crown a winner if a thinner (sparse) cell is actually cheaper — that would
-  // bold a pricier venue just because the cheaper one is under-sampled.
+  // don't crown a winner if a thinner (sparse) or non-physical (suspect) cell is actually
+  // cheaper — that would bold a pricier venue just because the cheaper one is unranked.
   if (!best || minAll < best[1] - 1e-9) return null;
   return best[0];
 }
@@ -92,9 +92,9 @@ function renderGapTable() {
       const c = cells[v];
       if (!c) { tr.appendChild(el("td", "muted", "–")); continue; }
       if (c.bad_realized) { const td = el("td", "muted", "n/a"); td.setAttribute("data-tip", `thin or stale cell: realized non-physical, suppressed${c.n != null ? ` (n=${c.n})` : ""}`); tr.appendChild(td); continue; }
-      const g = c.feed_limited ? `<span class="badge">fl</span>` : Math.max(c.gap, 0).toFixed(2);
+      const g = c.feed_limited ? `<span class="badge">fl</span>` : Math.max(c.gap, 0).toFixed(3);
       const star = c.sparse ? `<sup class="spk" data-tip="Sparse: only ${c.n} clip${c.n === 1 ? "" : "s"} of this size in the window (under 5). Shown for transparency, not ranked or crowned cheapest yet.">*</sup>` : "";
-      const td = el("td", v === best ? "best" : "", `${c.realized.toFixed(2)} <span class="g">(${g})</span>${star}`);
+      const td = el("td", v === best ? "best" : "", `${c.realized.toFixed(3)} <span class="g">(${g})</span>${star}`);
       if (c.n != null) td.setAttribute("data-tip", `n=${c.n} clips`);
       tr.appendChild(td);
     }
