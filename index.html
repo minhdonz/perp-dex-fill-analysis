@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RealizedFill · perp DEX execution quality</title>
+<meta name="description" content="Advertised vs realized execution cost across perp DEXs, tracked over time. Read-only, no capital.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<header class="nav">
+  <div class="brand">RealizedFill</div>
+  <div class="modes">
+    <button id="mode-taker" class="on">Taker analysis</button>
+    <button id="mode-maker">Maker analysis</button>
+  </div>
+  <nav id="taker-nav">
+    <a href="#gap">The Gap</a>
+    <a href="#cost">Cost</a>
+    <a href="#funding">Funding</a>
+    <a href="#track">Track Record</a>
+    <a href="#stress">Stress</a>
+    <a href="#method">Method</a>
+  </nav>
+  <div class="updated" id="updated"></div>
+</header>
+
+<div id="view-taker">
+<section id="hero">
+  <p class="eyebrow">Perp DEX execution quality</p>
+  <h1 id="headline">Loading…</h1>
+  <p class="tagline">Depth is what the book shows. Execution quality is what you actually get. This measures the second, across Hyperliquid, Lighter, and Pacifica, and tracks it over time.</p>
+</section>
+
+<main>
+  <section id="gap" class="block">
+    <h2>The Gap</h2>
+    <p class="lede">What the book promised vs what you actually filled.</p>
+    <p class="sub">Each cell shows a venue's <strong>realized fill cost</strong> in bps, with the <strong>gap</strong> in parentheses. <em>Realized</em> is what a clip of that size actually filled at vs the mid; <em>advertised</em> is what walking the order book for that size implied; the <em>gap</em> is realized minus advertised, so a positive gap means the venue filled worse than its book promised. The gap is floored at zero: a venue can't truly fill better than the book that existed before the trade, so any sub-zero value (book-age noise) shows as 0. This is execution quality only. Fees and funding are added in "Cost to run a position" below. Cheapest realized in bold. <sup>*</sup> = sparse (fewer than 5 clips in the window): shown for transparency, but not ranked or crowned cheapest until it has more data. <span class="badge">fl</span> = Pacifica book feed-limited (realized shown, not gap).</p>
+    <p class="key">cell format: <strong>realized</strong> <span class="muted">(gap vs advertised)</span></p>
+    <div class="tabs" id="gap-tabs"></div>
+    <div class="table-wrap"><table id="gap-table"></table></div>
+    <p class="key">Hover any cell or chart point for its clip count (n).</p>
+    <div class="chart-box"><canvas id="gap-chart"></canvas></div>
+  </section>
+
+  <section id="cost" class="block">
+    <h2>Cost to run a position</h2>
+    <p class="lede">Your all-in cost, sized to your own volume and hold.</p>
+    <p class="sub">Your all-in cost: slippage + taker fee (both legs) + funding over the hold. Computed live in your browser from your inputs.</p>
+    <div class="calc">
+      <div class="controls">
+        <label>
+          <span class="ctl-h">Asset</span>
+          <select id="c-asset"></select>
+        </label>
+        <label>
+          <span class="ctl-h">Clip size</span>
+          <select id="c-size"></select>
+        </label>
+        <label>
+          <span class="ctl-h">Your 14-day volume <span class="val" id="c-vol-val"></span></span>
+          <input type="range" id="c-vol" min="0" max="9" step="1" value="5">
+        </label>
+        <label>
+          <span class="ctl-h">Hold <span class="val" id="c-hold-val"></span></span>
+          <input type="range" id="c-hold" min="0" max="30" step="0.5" value="7">
+        </label>
+        <label>
+          <span class="ctl-h">Side</span>
+          <span class="toggle"><button data-side="long" class="on">Long</button><button data-side="short">Short</button></span>
+        </label>
+      </div>
+      <div class="legend">
+        <span><i class="sw s-slip"></i>slippage</span>
+        <span><i class="sw s-fee"></i>taker fee</span>
+        <span><i class="sw s-fund"></i>funding</span>
+      </div>
+      <div class="results" id="c-results"></div>
+      <p class="note" id="c-note"></p>
+    </div>
+  </section>
+
+  <section id="funding" class="block">
+    <h2>Funding &amp; carry</h2>
+    <p class="lede">Who pays you to hold, and how dependable the rate is.</p>
+    <p class="sub">Funding is the recurring payment between longs and shorts for holding a perp. A positive APR means longs pay shorts; negative means shorts pay longs (you're paid to be long). The rate resets hourly and drifts, so a trailing average alone can mislead: the stability columns show how often the rate changed sign (flip rate) and how directional it has been, so you can tell a dependable carry from a whippy one.</p>
+    <div class="tabs" id="fund-tabs"></div>
+    <div class="table-wrap"><table id="fund-table"></table></div>
+    <p class="note" id="fund-note"></p>
+  </section>
+
+  <section id="track" class="block">
+    <h2>Track record</h2>
+    <p class="lede">How execution holds up over time, not just today.</p>
+    <p class="sub">How the gap and cost evolve over time, which a static snapshot can't capture. History compounds.</p>
+    <div class="controls">
+      <label>Asset <select id="t-asset"></select></label>
+      <label>Clip size <select id="t-rung"></select></label>
+      <label>Metric <select id="t-metric"><option value="gap">Gap</option><option value="realized">Realized cost</option></select></label>
+    </div>
+    <div class="chart-box"><canvas id="track-chart"></canvas></div>
+    <h3>By time of day (Asia / EU / US, 2-hour windows)</h3>
+    <div id="heatmap" class="heatmap"></div>
+  </section>
+
+  <section id="stress" class="block">
+    <h2>Behavior under stress</h2>
+    <p class="lede">Does fill quality hold when the market breaks?</p>
+    <p class="sub">When the market gets liquidated, does fill quality hold? Cascades from the market-wide liquidation feed; execution during vs the prior-24h baseline.</p>
+    <div id="stress-body"></div>
+  </section>
+
+  <section id="method" class="block">
+    <h2>Methodology &amp; confidence</h2>
+    <p class="lede">What's measured, how, and where the seams are.</p>
+    <p class="sub">A single trade usually fills in many small pieces; before measuring its cost we group those pieces back into the one order the trader actually sent. How precisely we can do that depends on what each venue publishes, shown in the table below. We also slice the data into 2-hour windows: a window is "clean" if no feed disconnect or data gap was detected during it, and windows with a gap are dropped from every number above, so a brief outage is never mistaken for a real reading. The last column shows each venue's share of clean windows, i.e. how reliably we captured its data.</p>
+    <div class="table-wrap"><table id="cov-table"></table></div>
+    <ul id="seams"></ul>
+  </section>
+</main>
+</div><!-- /view-taker -->
+
+<div id="view-maker" hidden>
+<section id="mk-hero">
+  <p class="eyebrow">Hyperliquid maker landscape</p>
+  <h1>Can you compete on scale and cost?</h1>
+  <p class="tagline">Who the top market makers on Hyperliquid are, and what their business actually looks like: volume, open interest, markets quoted, daily PnL, and the fee and funding economics. Reconstructed from public on-chain data.</p>
+</section>
+
+<main>
+  <section id="mk-league" class="block">
+    <h2>The maker league</h2>
+    <p class="lede">Top makers by maker-side volume, with their economics.</p>
+    <p class="sub" id="mk-sub"></p>
+    <div class="chart-box"><canvas id="mk-chart"></canvas></div>
+    <div class="table-wrap"><table id="mk-table"></table></div>
+    <p class="note" id="mk-note"></p>
+  </section>
+
+  <section id="mk-method" class="block">
+    <h2>What's observable, and what isn't</h2>
+    <p class="lede">Hyperliquid is transparent. The honest limits.</p>
+    <ul id="mk-seams">
+      <li><strong>Hyperliquid only.</strong> It's an on-chain L1, so per-address positions, OI, PnL, and fees are public. Lighter exposes maker identity and volume but no economics; Pacifica exposes neither, so neither is shown here.</li>
+      <li><strong>Makers are identified from the 5 coins we stream</strong> (BTC, ETH, SOL, HYPE, ZEC), recovered from each trade's counterparty. The volume, OI, PnL, funding, and fees shown are each maker's full <em>cross-market</em> figures from Hyperliquid's public per-account data, not just those 5 coins.</li>
+      <li><strong>"Markets" = distinct markets the maker currently holds a position in.</strong> Resting quotes aren't public on any venue, so we can't show live order placement, only where a maker actually trades and carries risk.</li>
+      <li><strong>Makers are gated by a maker/taker volume ratio</strong> so directional takers crossing the book aren't mislabeled as market makers.</li>
+      <li><strong>Addresses are public on Hyperliquid.</strong> We rank and link them; we don't deanonymize.</li>
+    </ul>
+  </section>
+</main>
+</div><!-- /view-maker -->
+
+<footer>
+  <p>RealizedFill · read-only perp DEX execution-quality measurement · data refreshes periodically.</p>
+  <p>Built by Minh · <a href="https://x.com/0xMinhdonz" target="_blank" rel="noopener">@0xMinhdonz</a> · questions and feedback welcome.</p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
